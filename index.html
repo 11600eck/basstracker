@@ -1396,6 +1396,8 @@ select {
       </select>
       <button class="filter-chip" id="fish-filter-pb" onclick="toggleFilter('fish-pb')" aria-pressed="false" aria-label="Show only personal bests">PB Only</button>
       <button class="filter-chip" id="fish-filter-notable" onclick="toggleFilter('fish-notable')" aria-pressed="false" aria-label="Show only notable fish">Notable</button>
+      <button class="filter-chip" id="fish-filter-6lb" onclick="toggleFilter('fish-6lb')" aria-pressed="false" aria-label="Show only fish 6 lbs or heavier">6+ lb</button>
+      <button class="filter-chip" id="fish-filter-7lb" onclick="toggleFilter('fish-7lb')" aria-pressed="false" aria-label="Show only fish 7 lbs or heavier">7+ lb</button>
       <input type="text" id="fish-filter-loc" placeholder="Location..." aria-label="Filter by location" oninput="renderBigFish()" style="min-width:110px;min-height:40px;font-size:0.82rem;padding:8px 10px;">
     </div>
 
@@ -2117,6 +2119,57 @@ function submitSaveDay() {
   };
 
   savedDays.unshift(savedDay);
+
+  /* ── AUTO-PUSH BAG ──────────────────────────────────────
+     Push this trip's best-5 bag into bigBags automatically.
+     Uses a stable ID (savedDay.id + '_bag') to prevent
+     duplicates if the same trip is somehow saved twice.     */
+  if (best5.length > 0) {
+    const autoBagId = savedDay.id + '_bag';
+    const alreadyHasBag = bigBags.some(b => b.id === autoBagId);
+    if (!alreadyHasBag) {
+      const autoBag = {
+        id:       autoBagId,
+        date:     savedDay.date,
+        location: savedDay.location,
+        weights:  best5.map(f => f.weight).sort((a,b) => b - a),
+        total:    bagWeight,
+        lures:    '',
+        notes:    savedDay.notes || '',
+        photos:   [],
+        savedAt:  savedDay.savedAt,
+        autoAdded: true, // flag so user knows it came from a saved trip
+      };
+      bigBags.unshift(autoBag);
+    }
+  }
+
+  /* ── AUTO-PUSH QUALIFYING FISH (≥ 5.5 lb) ──────────────
+     Only fish 5.5 lbs or heavier are logged automatically.
+     Stable ID: savedDay.id + '_fish_' + originalFishId.
+     Skips any fish already present in bigFish.             */
+  const QUALIFYING_THRESHOLD = 5.5;
+  currentDay.fish.forEach(fish => {
+    if (fish.weight < QUALIFYING_THRESHOLD) return;
+    const autoFishId = savedDay.id + '_fish_' + fish.id;
+    const alreadyLogged = bigFish.some(f => f.id === autoFishId);
+    if (!alreadyLogged) {
+      bigFish.unshift({
+        id:        autoFishId,
+        weight:    fish.weight,
+        length:    fish.length || null,
+        date:      savedDay.date,
+        location:  savedDay.location,
+        lure:      fish.lure || '',
+        notes:     fish.notes || '',
+        photos:    fish.photos ? [...fish.photos] : [],
+        isPB:      fish.isPB || false,
+        isNotable: true, // 5.5+ lb qualifies as notable
+        autoAdded: true,
+      });
+    }
+  });
+
   persist();
   closeModal('save-day-modal');
   showToast('Day saved!');
@@ -2295,7 +2348,7 @@ function confirmDeleteDay(id) {
    ======================================================== */
 
 let pendingBfPhotos = [];
-const fishFilters = { pb: false, notable: false };
+const fishFilters = { pb: false, notable: false, w6: false, w7: false };
 
 function openBigFishModal(editId) {
   pendingBfPhotos = [];
@@ -2379,6 +2432,23 @@ function toggleFilter(key) {
     btn.classList.toggle('active', fishFilters.notable);
     btn.setAttribute('aria-pressed', String(fishFilters.notable));
   }
+  /* NEW: weight threshold filters */
+  if (key === 'fish-6lb') {
+    fishFilters.w6 = !fishFilters.w6;
+    if (fishFilters.w6) fishFilters.w7 = false; // mutually exclusive
+    document.getElementById('fish-filter-6lb').classList.toggle('active', fishFilters.w6);
+    document.getElementById('fish-filter-6lb').setAttribute('aria-pressed', String(fishFilters.w6));
+    document.getElementById('fish-filter-7lb').classList.toggle('active', false);
+    document.getElementById('fish-filter-7lb').setAttribute('aria-pressed', 'false');
+  }
+  if (key === 'fish-7lb') {
+    fishFilters.w7 = !fishFilters.w7;
+    if (fishFilters.w7) fishFilters.w6 = false; // mutually exclusive
+    document.getElementById('fish-filter-7lb').classList.toggle('active', fishFilters.w7);
+    document.getElementById('fish-filter-7lb').setAttribute('aria-pressed', String(fishFilters.w7));
+    document.getElementById('fish-filter-6lb').classList.toggle('active', false);
+    document.getElementById('fish-filter-6lb').setAttribute('aria-pressed', 'false');
+  }
   renderBigFish();
 }
 
@@ -2389,6 +2459,8 @@ function renderBigFish() {
 
   if (fishFilters.pb)      fish = fish.filter(f => f.isPB);
   if (fishFilters.notable) fish = fish.filter(f => f.isNotable);
+  if (fishFilters.w7)      fish = fish.filter(f => f.weight >= 7);   /* NEW: 7+ lb */
+  else if (fishFilters.w6) fish = fish.filter(f => f.weight >= 6);   /* NEW: 6+ lb */
   if (locFilt)             fish = fish.filter(f => (f.location||'').toLowerCase().includes(locFilt));
 
   switch(sort) {
