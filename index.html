@@ -1469,8 +1469,9 @@ select {
         <div class="input-row">
           <div class="form-group">
             <label for="fish-weight">Weight (lb) <span class="required-mark" aria-hidden="true">*</span></label>
-            <input type="number" id="fish-weight" name="weight" step="0.01" min="0.01" max="30" placeholder="e.g. 4.25" inputmode="decimal" required aria-required="true">
+            <input type="number" id="fish-weight" name="weight" step="0.01" min="0.01" max="30" placeholder="e.g. 4.25" inputmode="decimal" required aria-required="true" oninput="updateBagHint()">
             <div class="field-error" id="fish-weight-err" role="alert">Enter a valid weight (0.01–30 lb)</div>
+            <div id="fish-bag-hint" style="font-size:0.82rem;margin-top:6px;min-height:18px;font-weight:500;"></div>
           </div>
           <div class="form-group">
             <label for="fish-length">Length (in)</label>
@@ -1656,16 +1657,16 @@ select {
         <p style="font-size:0.85rem;color:var(--c-text2);margin-bottom:14px;">Enter the 5 fish weights for this bag. Leave unused slots blank.</p>
 
         <div class="input-row">
-          <div class="form-group"><label for="bag-w1">Fish 1 (lb) <span class="required-mark">*</span></label><input type="number" id="bag-w1" step="0.01" min="0.01" max="30" inputmode="decimal"></div>
-          <div class="form-group"><label for="bag-w2">Fish 2 (lb)</label><input type="number" id="bag-w2" step="0.01" min="0.01" max="30" inputmode="decimal"></div>
+          <div class="form-group"><label for="bag-w1">Fish 1 (lb) <span class="required-mark">*</span></label><input type="number" id="bag-w1" step="0.01" min="0.01" max="30" inputmode="decimal" oninput="updateBagTotalPreview()"></div>
+          <div class="form-group"><label for="bag-w2">Fish 2 (lb)</label><input type="number" id="bag-w2" step="0.01" min="0.01" max="30" inputmode="decimal" oninput="updateBagTotalPreview()"></div>
         </div>
         <div class="input-row">
-          <div class="form-group"><label for="bag-w3">Fish 3 (lb)</label><input type="number" id="bag-w3" step="0.01" min="0.01" max="30" inputmode="decimal"></div>
-          <div class="form-group"><label for="bag-w4">Fish 4 (lb)</label><input type="number" id="bag-w4" step="0.01" min="0.01" max="30" inputmode="decimal"></div>
+          <div class="form-group"><label for="bag-w3">Fish 3 (lb)</label><input type="number" id="bag-w3" step="0.01" min="0.01" max="30" inputmode="decimal" oninput="updateBagTotalPreview()"></div>
+          <div class="form-group"><label for="bag-w4">Fish 4 (lb)</label><input type="number" id="bag-w4" step="0.01" min="0.01" max="30" inputmode="decimal" oninput="updateBagTotalPreview()"></div>
         </div>
         <div class="form-group" style="max-width:100%">
           <label for="bag-w5">Fish 5 (lb)</label>
-          <input type="number" id="bag-w5" step="0.01" min="0.01" max="30" inputmode="decimal">
+          <input type="number" id="bag-w5" step="0.01" min="0.01" max="30" inputmode="decimal" oninput="updateBagTotalPreview()">
         </div>
 
         <div class="form-group">
@@ -1984,10 +1985,19 @@ function renderTodayFishList() {
 }
 
 function removeFishFromToday(id) {
-  currentDay.fish = currentDay.fish.filter(f => f.id !== id);
-  persist();
-  renderToday();
-  showToast('Fish removed');
+  /* Intentional friction — removal is irreversible, happens on touchscreen in field conditions */
+  const fish = currentDay.fish.find(f => f.id === id);
+  const label = fish ? fmtWeight(fish.weight) : 'this fish';
+  showConfirm(
+    'Remove Fish?',
+    `Remove ${label} from today's bag? This cannot be undone.`,
+    () => {
+      currentDay.fish = currentDay.fish.filter(f => f.id !== id);
+      persist();
+      renderToday();
+      showToast('Fish removed');
+    }
+  );
 }
 
 function renderHeaderStats() {
@@ -2016,9 +2026,29 @@ function openAddFishModal() {
   pendingFishPhotos = [];
   document.getElementById('add-fish-form').reset();
   document.getElementById('fish-photo-previews').innerHTML = '';
+  document.getElementById('fish-bag-hint').textContent = '';  /* clear hint on open */
   clearFieldError('fish-weight', 'fish-weight-err');
   openModal('add-fish-modal');
   setTimeout(() => document.getElementById('fish-weight').focus(), 200);
+}
+
+/* Live "would improve bag" hint while typing weight */
+function updateBagHint() {
+  const hint = document.getElementById('fish-bag-hint');
+  const val = parseFloat(document.getElementById('fish-weight').value);
+  if (!val || val <= 0) { hint.textContent = ''; return; }
+  const improves = wouldImprovesBag(val, currentDay.fish);
+  const best5 = getBest5(currentDay.fish);
+  if (best5.length < 5) {
+    hint.style.color = 'var(--c-accent)';
+    hint.textContent = `✓ Goes in your bag (${best5.length + 1} of 5)`;
+  } else if (improves) {
+    hint.style.color = 'var(--c-accent)';
+    hint.textContent = `✓ Would improve your bag`;
+  } else {
+    hint.style.color = 'var(--c-text3)';
+    hint.textContent = `Would not improve your current bag`;
+  }
 }
 
 document.getElementById('fish-photos').addEventListener('change', function(e) {
@@ -2172,7 +2202,18 @@ function submitSaveDay() {
 
   persist();
   closeModal('save-day-modal');
-  showToast('Day saved!');
+
+  /* Build informative toast: count what was actually auto-added */
+  const qualifyingCount = currentDay.fish.filter(f => f.weight >= QUALIFYING_THRESHOLD).length;
+  let toastMsg = 'Day saved!';
+  if (best5.length > 0 && qualifyingCount > 0) {
+    toastMsg = `Day saved · bag logged · ${qualifyingCount} fish auto-added`;
+  } else if (best5.length > 0) {
+    toastMsg = 'Day saved · bag logged to history';
+  } else if (qualifyingCount > 0) {
+    toastMsg = `Day saved · ${qualifyingCount} fish auto-added to log`;
+  }
+  showToast(toastMsg);
   renderHeaderStats();
 }
 
@@ -2193,6 +2234,10 @@ function confirmStartNewDay() {
 }
 
 function startNewDay() {
+  /* Auto-save a draft of the current day before clearing, so data isn't silently lost */
+  if (currentDay.fish.length > 0) {
+    saveData('bt_lastDayDraft', { ...currentDay, draftSavedAt: Date.now() });
+  }
   currentDay = newCurrentDay();
   persist();
   renderToday();
@@ -2476,7 +2521,7 @@ function renderBigFish() {
     el.innerHTML = `<div class="empty-state">
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></svg>
       <h3>No fish entries</h3>
-      <p>Tap "Add Entry" to log your notable catches.</p>
+      <p>Bass 5.5 lb+ are added automatically when you save a day. You can also tap "Add Entry" to log a catch manually.</p>
     </div>`;
     return;
   }
@@ -2622,7 +2667,7 @@ function renderBagHistory() {
     el.innerHTML = `<div class="empty-state">
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"/></svg>
       <h3>No bags saved yet</h3>
-      <p>Tap "Save Bag" to record a completed 5-fish bag.</p>
+      <p>Your best-5 bag is added automatically when you save a day. You can also tap "Save Bag" to log one manually.</p>
     </div>`;
     return;
   }
@@ -2766,9 +2811,9 @@ function showConfirm(title, message, callback) {
 }
 
 function confirmAction() {
+  const cb = confirmCallback; /* save before closeConfirm nulls it */
   closeConfirm();
-  if (confirmCallback) confirmCallback();
-  confirmCallback = null;
+  if (cb) cb();
 }
 
 function closeConfirm() {
