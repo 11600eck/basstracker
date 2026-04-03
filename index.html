@@ -1432,6 +1432,56 @@ select {
     </div>
   </section>
 
+  <!-- ── SETTINGS SCREEN ──────────────────────────────── -->
+  <section id="screen-settings" class="screen" aria-labelledby="nav-settings-label">
+    <div class="screen-section">
+      <h2>Settings</h2>
+    </div>
+
+    <!-- GitHub Backup -->
+    <div style="margin:0 16px 12px;">
+      <div style="background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--r-lg);overflow:hidden;">
+        <div style="padding:14px 16px 10px;border-bottom:1px solid var(--c-border);">
+          <div style="font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--c-text3);margin-bottom:2px;">GitHub Auto-Backup</div>
+          <div style="font-size:0.82rem;color:var(--c-text2);line-height:1.5;">Your data backs up automatically every time you save a day. One-time setup.</div>
+          <div id="gh-status-row" style="margin-top:8px;font-size:0.82rem;font-weight:600;color:var(--c-text3);">Not configured</div>
+        </div>
+
+        <div style="padding:14px 16px;">
+          <div style="margin-bottom:12px;">
+            <label for="gh-token" style="display:block;font-size:0.8rem;font-weight:600;color:var(--c-text2);margin-bottom:6px;">Personal Access Token</label>
+            <input type="password" id="gh-token" placeholder="ghp_xxxxxxxxxxxx" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+              style="width:100%;background:var(--c-bg3);border:1px solid var(--c-border);border-radius:var(--r);padding:12px 14px;font-size:0.9rem;color:var(--c-text);font-family:var(--font-mono);">
+          </div>
+          <div style="margin-bottom:14px;">
+            <label for="gh-repo" style="display:block;font-size:0.8rem;font-weight:600;color:var(--c-text2);margin-bottom:6px;">Repository (username/repo-name)</label>
+            <input type="text" id="gh-repo" placeholder="yourname/bass-tracker-data" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+              style="width:100%;background:var(--c-bg3);border:1px solid var(--c-border);border-radius:var(--r);padding:12px 14px;font-size:0.9rem;color:var(--c-text);">
+          </div>
+          <button onclick="saveGHSettingsInline()" class="btn btn-primary" style="width:100%;margin-bottom:8px;">Save & Test Connection</button>
+          <button onclick="githubBackup(false)" class="btn btn-secondary" style="width:100%;margin-bottom:8px;">☁ Backup to GitHub Now</button>
+          <button onclick="githubRestore()" class="btn btn-secondary" style="width:100%;">↓ Restore from GitHub</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Local Backup -->
+    <div style="margin:0 16px 12px;">
+      <div style="background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--r-lg);overflow:hidden;">
+        <div style="padding:14px 16px 10px;border-bottom:1px solid var(--c-border);">
+          <div style="font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--c-text3);margin-bottom:2px;">Local Backup</div>
+          <div style="font-size:0.82rem;color:var(--c-text2);line-height:1.5;">Export a backup file to save locally or to iCloud Files as a manual fallback.</div>
+        </div>
+        <div style="padding:14px 16px;display:flex;flex-direction:column;gap:8px;">
+          <button onclick="exportData()" class="btn btn-secondary" style="width:100%;">Export Backup File</button>
+          <button onclick="importData()" class="btn btn-secondary" style="width:100%;">Import Backup File</button>
+        </div>
+      </div>
+    </div>
+
+    <div style="height:24px;"></div>
+  </section>
+
 </main>
 
 <!-- ============================================================
@@ -1453,6 +1503,10 @@ select {
   <button class="nav-btn" id="nav-bags" onclick="switchScreen('bags')" aria-label="Bag history" aria-pressed="false">
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"/></svg>
     <span id="nav-bags-label">Bags</span>
+  </button>
+  <button class="nav-btn" id="nav-settings" onclick="switchScreen('settings')" aria-label="Settings" aria-pressed="false">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+    <span id="nav-settings-label">Settings</span>
   </button>
 </nav>
 
@@ -1878,10 +1932,11 @@ function switchScreen(name) {
   navBtn.classList.add('active');
   navBtn.setAttribute('aria-pressed','true');
 
-  if (name === 'history') renderHistory();
-  if (name === 'fish')    renderBigFish();
-  if (name === 'bags')    renderBagHistory();
-  if (name === 'today')   renderToday();
+  if (name === 'history')  renderHistory();
+  if (name === 'fish')     renderBigFish();
+  if (name === 'bags')     renderBagHistory();
+  if (name === 'today')    renderToday();
+  if (name === 'settings') renderSettingsScreen();
 }
 
 /* ========================================================
@@ -2218,6 +2273,8 @@ function submitSaveDay() {
   }
   showToast(toastMsg);
   renderHeaderStats();
+  /* Auto-backup silently to GitHub after every save — fire and forget */
+  githubBackup(true);
 }
 
 /* ========================================================
@@ -2874,18 +2931,72 @@ document.getElementById('lightbox').addEventListener('click', e => {
 });
 
 /* ========================================================
-   EXPORT / IMPORT (Settings accessible from header long-press)
+   SETTINGS SCREEN
    ======================================================== */
 
-function exportData() {
-  const data = {
+function renderSettingsScreen() {
+  const cfg = getGHConfig();
+  const statusEl = document.getElementById('gh-status-row');
+  if (!statusEl) return;
+  if (cfg.token && cfg.repo) {
+    const last = cfg.lastBackup ? `Last backup: ${cfg.lastBackup.slice(0,10)}` : 'Never backed up yet';
+    statusEl.style.color = 'var(--c-accent)';
+    statusEl.textContent = `✓ Connected — ${cfg.repo} · ${last}`;
+  } else {
+    statusEl.style.color = 'var(--c-text3)';
+    statusEl.textContent = 'Not configured';
+  }
+  /* Pre-fill saved values into the inline inputs */
+  const tokenEl = document.getElementById('gh-token');
+  const repoEl  = document.getElementById('gh-repo');
+  if (tokenEl && cfg.token) tokenEl.value = cfg.token;
+  if (repoEl  && cfg.repo)  repoEl.value  = cfg.repo;
+}
+
+async function saveGHSettingsInline() {
+  const token = (document.getElementById('gh-token').value || '').trim();
+  const repo  = (document.getElementById('gh-repo').value  || '').trim();
+  if (!token || !repo)          { showToast('Enter both token and repo name'); return; }
+  if (!repo.includes('/'))      { showToast('Repo must be username/repo-name'); return; }
+  saveGHConfig({ token, repo });
+  showToast('Testing connection…');
+  const ok = await githubBackup(false);
+  if (ok) {
+    renderSettingsScreen(); /* refresh status row */
+    showToast('✓ GitHub backup configured & working!');
+  }
+}
+
+/* ========================================================
+   EXPORT / IMPORT + GITHUB AUTO-BACKUP
+   ======================================================== */
+
+/* ── GitHub backup config stored separately so it survives data clears ── */
+const GH_KEY = 'bt_github_config';
+
+function getGHConfig() {
+  try { return JSON.parse(localStorage.getItem(GH_KEY)) || {}; } catch(e) { return {}; }
+}
+
+function saveGHConfig(cfg) {
+  localStorage.setItem(GH_KEY, JSON.stringify(cfg));
+}
+
+/* ── Core backup payload ── */
+function buildBackupPayload() {
+  return {
     exportedAt: new Date().toISOString(),
+    version: 2,
     currentDay,
     savedDays,
     bigFish,
     bigBags,
   };
-  const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+}
+
+/* ── Local export (unchanged) ── */
+function exportData() {
+  const blob = new Blob([JSON.stringify(buildBackupPayload(), null, 2)], {type: 'application/json'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -2895,6 +3006,7 @@ function exportData() {
   showToast('Backup exported');
 }
 
+/* ── Local import (unchanged) ── */
 function importData() {
   const input = document.createElement('input');
   input.type = 'file';
@@ -2929,7 +3041,173 @@ function importData() {
   input.click();
 }
 
-// Long-press header for export/import (accessible via double-tap too)
+/* ── GitHub API helpers ── */
+async function ghRequest(method, path, body, token) {
+  const res = await fetch(`https://api.github.com${path}`, {
+    method,
+    headers: {
+      'Authorization': `token ${token}`,
+      'Accept': 'application/vnd.github.v3+json',
+      'Content-Type': 'application/json',
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  return { ok: res.ok, status: res.status, data: await res.json() };
+}
+
+/* ── Push backup to GitHub ── */
+async function githubBackup(silent = false) {
+  const cfg = getGHConfig();
+  if (!cfg.token || !cfg.repo) {
+    if (!silent) showToast('Set up GitHub backup in Settings first');
+    return false;
+  }
+
+  if (!silent) showToast('Backing up to GitHub…');
+
+  try {
+    const content = btoa(unescape(encodeURIComponent(JSON.stringify(buildBackupPayload(), null, 2))));
+    const filePath = `/repos/${cfg.repo}/contents/bass-tracker-backup.json`;
+
+    /* Check if file already exists to get its SHA (needed for updates) */
+    const existing = await ghRequest('GET', filePath, null, cfg.token);
+    const sha = existing.ok ? existing.data.sha : undefined;
+
+    const result = await ghRequest('PUT', filePath, {
+      message: `Bass Tracker auto-backup ${new Date().toISOString().slice(0,10)}`,
+      content,
+      ...(sha ? { sha } : {}),
+    }, cfg.token);
+
+    if (result.ok) {
+      const ts = new Date().toISOString();
+      saveGHConfig({ ...cfg, lastBackup: ts });
+      if (!silent) showToast('✓ Backed up to GitHub');
+      return true;
+    } else {
+      if (!silent) showToast('GitHub backup failed — check your token & repo');
+      return false;
+    }
+  } catch(err) {
+    if (!silent) showToast('GitHub backup failed — check internet connection');
+    return false;
+  }
+}
+
+/* ── Restore from GitHub ── */
+async function githubRestore() {
+  const cfg = getGHConfig();
+  if (!cfg.token || !cfg.repo) {
+    showToast('Set up GitHub backup in Settings first');
+    return;
+  }
+
+  showToast('Fetching from GitHub…');
+
+  try {
+    const filePath = `/repos/${cfg.repo}/contents/bass-tracker-backup.json`;
+    const result = await ghRequest('GET', filePath, null, cfg.token);
+
+    if (!result.ok) {
+      showToast('No backup found on GitHub yet');
+      return;
+    }
+
+    const decoded = decodeURIComponent(escape(atob(result.data.content.replace(/\n/g, ''))));
+    const data = JSON.parse(decoded);
+
+    showConfirm(
+      'Restore from GitHub?',
+      `Backup from ${data.exportedAt ? data.exportedAt.slice(0,10) : 'unknown date'}. This will replace all current data.`,
+      () => {
+        if (data.currentDay) currentDay = data.currentDay;
+        if (data.savedDays)  savedDays  = data.savedDays;
+        if (data.bigFish)    bigFish    = data.bigFish;
+        if (data.bigBags)    bigBags    = data.bigBags;
+        persist();
+        renderToday();
+        renderHeaderStats();
+        showToast('✓ Restored from GitHub');
+      }
+    );
+  } catch(err) {
+    showToast('Restore failed — check your connection');
+  }
+}
+
+/* ── Check on launch: if localStorage empty but GitHub configured, offer restore ── */
+async function checkRestoreOnLaunch() {
+  const cfg = getGHConfig();
+  if (!cfg.token || !cfg.repo) return;
+  if (savedDays.length > 0 || bigFish.length > 0 || bigBags.length > 0) return;
+
+  /* Data looks empty — offer restore */
+  showConfirm(
+    'Restore from GitHub?',
+    'Your local data appears empty but you have a GitHub backup configured. Restore it now?',
+    githubRestore
+  );
+}
+
+/* ── GitHub settings modal ── */
+function openGHSettings() {
+  closeDataMenu();
+  const cfg = getGHConfig();
+
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:600;display:flex;align-items:flex-end;justify-content:center;';
+
+  overlay.innerHTML = `
+    <div style="background:var(--c-bg2);border-radius:16px 16px 0 0;border:1px solid var(--c-border);width:100%;max-width:430px;padding:20px 16px 40px;">
+      <div style="width:36px;height:4px;background:var(--c-border2);border-radius:2px;margin:0 auto 18px;"></div>
+      <h2 style="font-size:1.1rem;font-weight:700;color:var(--c-text);margin-bottom:6px;">GitHub Auto-Backup</h2>
+      <p style="font-size:0.82rem;color:var(--c-text2);margin-bottom:18px;line-height:1.5;">Your data backs up automatically to a private GitHub repo every time you save a day. One-time setup.</p>
+
+      <div style="margin-bottom:14px;">
+        <label style="display:block;font-size:0.8rem;font-weight:600;color:var(--c-text2);margin-bottom:6px;">GitHub Personal Access Token</label>
+        <input id="gh-token-input" type="password" placeholder="ghp_xxxxxxxxxxxx"
+          style="width:100%;background:var(--c-bg3);border:1px solid var(--c-border);border-radius:var(--r);padding:12px 14px;font-size:0.95rem;color:var(--c-text);font-family:var(--font-mono);"
+          value="${cfg.token || ''}">
+      </div>
+
+      <div style="margin-bottom:18px;">
+        <label style="display:block;font-size:0.8rem;font-weight:600;color:var(--c-text2);margin-bottom:6px;">Repository (username/repo-name)</label>
+        <input id="gh-repo-input" type="text" placeholder="yourname/bass-tracker-data"
+          style="width:100%;background:var(--c-bg3);border:1px solid var(--c-border);border-radius:var(--r);padding:12px 14px;font-size:0.95rem;color:var(--c-text);"
+          value="${cfg.repo || ''}">
+      </div>
+
+      ${cfg.lastBackup ? `<p style="font-size:0.78rem;color:var(--c-accent);margin-bottom:14px;">✓ Last backup: ${cfg.lastBackup.slice(0,10)}</p>` : ''}
+
+      <button onclick="saveGHSettings()" style="width:100%;padding:14px;background:var(--c-accent);border:none;border-radius:var(--r);font-size:1rem;font-weight:700;color:#fff;cursor:pointer;margin-bottom:10px;">Save & Test Connection</button>
+      <button onclick="githubRestore();document.getElementById('gh-overlay').remove();" style="width:100%;padding:13px;background:transparent;border:1px solid var(--c-border2);border-radius:var(--r);font-size:0.95rem;font-weight:500;color:var(--c-text2);cursor:pointer;margin-bottom:10px;">Restore from GitHub</button>
+      <button onclick="document.getElementById('gh-overlay').remove();" style="width:100%;padding:13px;background:transparent;border:none;font-size:0.9rem;color:var(--c-text3);cursor:pointer;">Cancel</button>
+    </div>
+  `;
+
+  overlay.id = 'gh-overlay';
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+}
+
+async function saveGHSettings() {
+  const token = document.getElementById('gh-token-input').value.trim();
+  const repo  = document.getElementById('gh-repo-input').value.trim();
+
+  if (!token || !repo) { showToast('Enter both token and repo'); return; }
+  if (!repo.includes('/')) { showToast('Repo must be username/repo-name'); return; }
+
+  saveGHConfig({ token, repo });
+
+  document.getElementById('gh-overlay').remove();
+  showToast('Testing connection…');
+
+  /* Test by doing a real backup */
+  const ok = await githubBackup(false);
+  if (ok) showToast('✓ GitHub backup configured & working!');
+}
+
+// Long-press header for data menu
 let headerPressTimer = null;
 const appHeader = document.getElementById('app-header');
 appHeader.addEventListener('touchstart', () => {
@@ -2943,18 +3221,22 @@ let dataMenuOpen = false;
 function showDataMenu() {
   if (dataMenuOpen) return;
   dataMenuOpen = true;
+  const cfg = getGHConfig();
+  const ghStatus = cfg.token ? `✓ GitHub connected` : 'Set up GitHub Backup';
 
   const menu = document.createElement('div');
-  menu.style.cssText = `position:fixed;top:${document.getElementById('app-header').offsetHeight+4}px;right:12px;background:var(--c-surface);border:1px solid var(--c-border2);border-radius:var(--r-lg);padding:8px;z-index:500;min-width:180px;box-shadow:0 8px 24px rgba(0,0,0,0.4);`;
+  menu.style.cssText = `position:fixed;top:${document.getElementById('app-header').offsetHeight+4}px;right:12px;background:var(--c-surface);border:1px solid var(--c-border2);border-radius:var(--r-lg);padding:8px;z-index:500;min-width:200px;box-shadow:0 8px 24px rgba(0,0,0,0.4);`;
   menu.innerHTML = `
-    <button onclick="exportData();closeDataMenu()" style="display:block;width:100%;text-align:left;padding:12px 14px;background:none;border:none;color:var(--c-text);font-size:0.9rem;font-weight:600;cursor:pointer;border-radius:8px;">Export Backup</button>
-    <button onclick="importData();closeDataMenu()" style="display:block;width:100%;text-align:left;padding:12px 14px;background:none;border:none;color:var(--c-text);font-size:0.9rem;font-weight:600;cursor:pointer;border-radius:8px;">Import Backup</button>
+    <button onclick="githubBackup(false);closeDataMenu()" style="display:block;width:100%;text-align:left;padding:12px 14px;background:none;border:none;color:${cfg.token ? 'var(--c-accent)' : 'var(--c-text)'};font-size:0.9rem;font-weight:600;cursor:pointer;border-radius:8px;">☁ Backup to GitHub</button>
+    <button onclick="openGHSettings()" style="display:block;width:100%;text-align:left;padding:12px 14px;background:none;border:none;color:var(--c-text2);font-size:0.82rem;cursor:pointer;border-radius:8px;">${ghStatus}</button>
     <div style="height:1px;background:var(--c-border);margin:4px 0;"></div>
-    <button onclick="closeDataMenu()" style="display:block;width:100%;text-align:left;padding:12px 14px;background:none;border:none;color:var(--c-text2);font-size:0.88rem;cursor:pointer;border-radius:8px;">Cancel</button>
+    <button onclick="exportData();closeDataMenu()" style="display:block;width:100%;text-align:left;padding:12px 14px;background:none;border:none;color:var(--c-text);font-size:0.9rem;font-weight:600;cursor:pointer;border-radius:8px;">Export Local Backup</button>
+    <button onclick="importData();closeDataMenu()" style="display:block;width:100%;text-align:left;padding:12px 14px;background:none;border:none;color:var(--c-text);font-size:0.9rem;font-weight:600;cursor:pointer;border-radius:8px;">Import Local Backup</button>
+    <div style="height:1px;background:var(--c-border);margin:4px 0;"></div>
+    <button onclick="closeDataMenu()" style="display:block;width:100%;text-align:left;padding:12px 14px;background:none;border:none;color:var(--c-text3);font-size:0.88rem;cursor:pointer;border-radius:8px;">Cancel</button>
   `;
   document.body.appendChild(menu);
 
-  // Close on outside click
   setTimeout(() => {
     document.addEventListener('click', function handler(e) {
       if (!menu.contains(e.target)) { closeDataMenu(); document.removeEventListener('click', handler); }
@@ -2975,6 +3257,7 @@ function closeDataMenu() {
 
 renderToday();
 renderHeaderStats();
+checkRestoreOnLaunch();
 
 </script>
 </body>
