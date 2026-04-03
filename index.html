@@ -2321,8 +2321,8 @@ function renderHistory() {
 
   // Sort
   switch(sort) {
-    case 'newest':       days.sort((a,b) => b.savedAt - a.savedAt); break;
-    case 'oldest':       days.sort((a,b) => a.savedAt - b.savedAt); break;
+    case 'newest':       days.sort((a,b) => new Date(b.date) - new Date(a.date)); break;
+    case 'oldest':       days.sort((a,b) => new Date(a.date) - new Date(b.date)); break;
     case 'heaviest-bag': days.sort((a,b) => b.bagWeight - a.bagWeight); break;
     case 'biggest-fish': days.sort((a,b) => b.biggestFish - a.biggestFish); break;
     case 'most-fish':    days.sort((a,b) => b.fishCount - a.fishCount); break;
@@ -2715,8 +2715,8 @@ function renderBagHistory() {
   if (locFilt) bags = bags.filter(b => (b.location||'').toLowerCase().includes(locFilt));
 
   switch(sort) {
-    case 'newest':      bags.sort((a,b) => b.savedAt - a.savedAt); break;
-    case 'oldest':      bags.sort((a,b) => a.savedAt - b.savedAt); break;
+    case 'newest':      bags.sort((a,b) => new Date(b.date) - new Date(a.date)); break;
+    case 'oldest':      bags.sort((a,b) => new Date(a.date) - new Date(b.date)); break;
     case 'heaviest':    bags.sort((a,b) => b.total - a.total); break;
     case 'biggest-fish':bags.sort((a,b) => Math.max(...b.weights) - Math.max(...a.weights)); break;
     case 'location':    bags.sort((a,b) => (a.location||'').localeCompare(b.location||'')); break;
