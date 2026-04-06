@@ -1522,6 +1522,7 @@ select {
     </div>
     <div class="modal-body">
       <form id="add-fish-form" novalidate onsubmit="return false;">
+        <input type="hidden" id="fish-edit-id">
 
         <div class="input-row">
           <div class="form-group">
@@ -1538,12 +1539,12 @@ select {
 
         <div class="form-group">
           <label for="fish-location">Lake / Location</label>
-          <input type="text" id="fish-location" name="location" placeholder="e.g. Lake Fork" autocomplete="off">
+          <input type="text" id="fish-location" name="location" placeholder="e.g. Lake Fork" autocomplete="off" list="location-suggestions">
         </div>
 
         <div class="form-group">
           <label for="fish-lure">Bait / Lure</label>
-          <input type="text" id="fish-lure" name="lure" placeholder="e.g. Ned Rig, Green Pumpkin" autocomplete="off">
+          <input type="text" id="fish-lure" name="lure" placeholder="e.g. Ned Rig, Green Pumpkin" autocomplete="off" list="lure-suggestions">
         </div>
 
         <div class="form-group">
@@ -1596,7 +1597,7 @@ select {
 
         <div class="form-group">
           <label for="day-location">Lake / Location <span class="required-mark" aria-hidden="true">*</span></label>
-          <input type="text" id="day-location" placeholder="e.g. Sam Rayburn" required aria-required="true">
+          <input type="text" id="day-location" placeholder="e.g. Sam Rayburn" required aria-required="true" list="location-suggestions">
           <div class="field-error" id="day-location-err" role="alert">Location is required</div>
         </div>
 
@@ -1660,12 +1661,12 @@ select {
 
         <div class="form-group">
           <label for="bf-location">Lake / Location</label>
-          <input type="text" id="bf-location" placeholder="e.g. Toledo Bend">
+          <input type="text" id="bf-location" placeholder="e.g. Toledo Bend" list="location-suggestions">
         </div>
 
         <div class="form-group">
           <label for="bf-lure">Bait / Lure</label>
-          <input type="text" id="bf-lure" placeholder="e.g. Swimbait">
+          <input type="text" id="bf-lure" placeholder="e.g. Swimbait" list="lure-suggestions">
         </div>
 
         <div class="form-group">
@@ -1733,12 +1734,12 @@ select {
 
         <div class="form-group">
           <label for="bag-save-location">Lake / Location</label>
-          <input type="text" id="bag-save-location" placeholder="e.g. Guntersville">
+          <input type="text" id="bag-save-location" placeholder="e.g. Guntersville" list="location-suggestions">
         </div>
 
         <div class="form-group">
           <label for="bag-save-lures">Lure Patterns</label>
-          <input type="text" id="bag-save-lures" placeholder="e.g. Spinnerbait, Texas Rig">
+          <input type="text" id="bag-save-lures" placeholder="e.g. Spinnerbait, Texas Rig" list="lure-suggestions">
         </div>
 
         <div class="form-group">
@@ -1792,6 +1793,10 @@ select {
   <button class="lightbox-close" onclick="closeLightbox()" aria-label="Close photo">&times;</button>
   <img id="lightbox-img" src="" alt="Full size fish photo">
 </div>
+
+<!-- Autocomplete suggestion lists -->
+<datalist id="location-suggestions"></datalist>
+<datalist id="lure-suggestions"></datalist>
 
 <!-- ============================================================
      JAVASCRIPT
@@ -1869,6 +1874,43 @@ function persist() {
   saveData(STORAGE_KEYS.savedDays,  savedDays);
   saveData(STORAGE_KEYS.bigFish,    bigFish);
   saveData(STORAGE_KEYS.bigBags,    bigBags);
+  buildSuggestions();
+}
+
+function buildSuggestions() {
+  const locations = new Set();
+  const lures     = new Set();
+
+  const addFish = f => {
+    if (f.location) locations.add(f.location.trim());
+    if (f.lure)     lures.add(f.lure.trim());
+  };
+
+  currentDay.fish.forEach(addFish);
+  if (currentDay.location) locations.add(currentDay.location.trim());
+
+  savedDays.forEach(d => {
+    if (d.location) locations.add(d.location.trim());
+    (d.fish || []).forEach(addFish);
+  });
+
+  bigFish.forEach(addFish);
+
+  bigBags.forEach(b => {
+    if (b.location) locations.add(b.location.trim());
+    if (b.lures) b.lures.split(',').forEach(l => { const t = l.trim(); if (t) lures.add(t); });
+  });
+
+  const fillList = (id, values) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.innerHTML = [...values].sort((a,b) => a.localeCompare(b))
+      .map(v => `<option value="${escapHtml(v)}">`)
+      .join('');
+  };
+
+  fillList('location-suggestions', locations);
+  fillList('lure-suggestions',     lures);
 }
 
 /* ========================================================
@@ -2031,6 +2073,9 @@ function renderTodayFishList() {
             </div>
           </div>
           <div class="fish-card-actions">
+            <button class="btn btn-sm btn-ghost btn-icon" onclick="openAddFishModal('${fish.id}')" aria-label="Edit this fish entry" title="Edit">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+            </button>
             <button class="btn btn-sm btn-ghost btn-icon" onclick="removeFishFromToday('${fish.id}')" aria-label="Delete this fish entry" title="Delete">
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
             </button>
@@ -2080,12 +2125,33 @@ function renderHeaderStats() {
 
 let pendingFishPhotos = [];
 
-function openAddFishModal() {
+function openAddFishModal(editId) {
   pendingFishPhotos = [];
   document.getElementById('add-fish-form').reset();
+  document.getElementById('fish-edit-id').value = editId || '';
   document.getElementById('fish-photo-previews').innerHTML = '';
-  document.getElementById('fish-bag-hint').textContent = '';  /* clear hint on open */
+  document.getElementById('fish-bag-hint').textContent = '';
   clearFieldError('fish-weight', 'fish-weight-err');
+
+  const titleEl = document.getElementById('add-fish-modal-title');
+  if (editId) {
+    const fish = currentDay.fish.find(f => f.id === editId);
+    if (fish) {
+      titleEl.textContent = 'Edit Fish Catch';
+      document.getElementById('fish-weight').value   = fish.weight;
+      document.getElementById('fish-length').value   = fish.length || '';
+      document.getElementById('fish-location').value = fish.location || '';
+      document.getElementById('fish-lure').value     = fish.lure || '';
+      document.getElementById('fish-notes').value    = fish.notes || '';
+      document.getElementById('fish-is-pb').checked  = !!fish.isPB;
+      pendingFishPhotos = [...(fish.photos || [])];
+      renderPhotoThumbs(pendingFishPhotos, 'fish-photo-previews');
+      updateBagHint();
+    }
+  } else {
+    titleEl.textContent = 'Add Fish Catch';
+  }
+
   openModal('add-fish-modal');
   setTimeout(() => document.getElementById('fish-weight').focus(), 200);
 }
@@ -2121,39 +2187,45 @@ function submitAddFish() {
   }
   clearFieldError('fish-weight', 'fish-weight-err');
 
+  const editId = document.getElementById('fish-edit-id').value;
+
   const entry = {
-    id:       uid(),
-    weight:   weightVal,
-    length:   parseFloat(document.getElementById('fish-length').value) || null,
-    location: document.getElementById('fish-location').value.trim() || currentDay.location,
-    lure:     document.getElementById('fish-lure').value.trim(),
-    notes:    document.getElementById('fish-notes').value.trim(),
-    photos:   [...pendingFishPhotos],
-    isPB:     document.getElementById('fish-is-pb').checked,
-    timestamp: Date.now(),
+    id:        editId || uid(),
+    weight:    weightVal,
+    length:    parseFloat(document.getElementById('fish-length').value) || null,
+    location:  document.getElementById('fish-location').value.trim() || currentDay.location,
+    lure:      document.getElementById('fish-lure').value.trim(),
+    notes:     document.getElementById('fish-notes').value.trim(),
+    photos:    [...pendingFishPhotos],
+    isPB:      document.getElementById('fish-is-pb').checked,
+    timestamp: editId
+      ? (currentDay.fish.find(f => f.id === editId) || {}).timestamp || Date.now()
+      : Date.now(),
   };
 
-  // If no session location set, inherit
-  if (!currentDay.location && entry.location) {
-    currentDay.location = entry.location;
+  if (editId) {
+    const idx = currentDay.fish.findIndex(f => f.id === editId);
+    if (idx > -1) currentDay.fish[idx] = entry;
+  } else {
+    // If no session location set, inherit
+    if (!currentDay.location && entry.location) {
+      currentDay.location = entry.location;
+    }
+    // Auto-set date if not set
+    if (!currentDay.date) currentDay.date = todayISO();
+    currentDay.fish.push(entry);
   }
 
-  // Auto-set date if not set
-  if (!currentDay.date) currentDay.date = todayISO();
-
-  currentDay.fish.push(entry);
   persist();
-
   closeModal('add-fish-modal');
   renderToday();
 
-  // Tell user if fish made the bag
-  const best5 = getBest5(currentDay.fish);
-  const inBag = best5.some(f => f.id === entry.id);
-  if (inBag) {
-    showToast(`${fmtWeight(entry.weight)} — in your best 5 bag!`);
+  if (editId) {
+    showToast(`${fmtWeight(entry.weight)} updated`);
   } else {
-    showToast(`${fmtWeight(entry.weight)} logged`);
+    const best5 = getBest5(currentDay.fish);
+    const inBag = best5.some(f => f.id === entry.id);
+    showToast(inBag ? `${fmtWeight(entry.weight)} — in your best 5 bag!` : `${fmtWeight(entry.weight)} logged`);
   }
 }
 
@@ -3255,6 +3327,7 @@ function closeDataMenu() {
    INIT
    ======================================================== */
 
+buildSuggestions();
 renderToday();
 renderHeaderStats();
 checkRestoreOnLaunch();
