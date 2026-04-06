@@ -1,0 +1,3264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="description" content="Bass fishing tracker for current day best-5 bags, trip history, and big fish records.">
+<title>Bass Tracker</title>
+<style>
+/* ========================================================
+   DESIGN TOKENS & RESET
+   ======================================================== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  /* Colors */
+  --c-bg:        #0e1118;
+  --c-bg2:       #161b24;
+  --c-bg3:       #1e2633;
+  --c-surface:   #242d3a;
+  --c-surface2:  #2c3644;
+  --c-border:    #334155;
+  --c-border2:   #475569;
+
+  --c-text:      #f0f4f8;
+  --c-text2:     #94a3b8;
+  --c-text3:     #64748b;
+
+  --c-accent:    #22c55e;   /* green */
+  --c-accent2:   #16a34a;
+  --c-accent-dim:#14532d;
+  --c-blue:      #3b82f6;
+  --c-blue-dim:  #1e3a5f;
+  --c-amber:     #f59e0b;
+  --c-amber-dim: #451a03;
+  --c-red:       #ef4444;
+  --c-red-dim:   #450a0a;
+
+  /* Typography */
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'SF Mono', 'Fira Mono', monospace;
+
+  /* Spacing */
+  --r: 10px;
+  --r-lg: 14px;
+
+  /* Nav */
+  --nav-h: 62px;
+  --header-h: 56px;
+}
+
+html { font-size: 16px; -webkit-text-size-adjust: 100%; }
+
+body {
+  font-family: var(--font);
+  background: var(--c-bg);
+  color: var(--c-text);
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+}
+
+/* Focus rings — always visible */
+:focus-visible {
+  outline: 2px solid var(--c-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ========================================================
+   TYPOGRAPHY
+   ======================================================== */
+h1 { font-size: 1.5rem; font-weight: 700; line-height: 1.2; }
+h2 { font-size: 1.25rem; font-weight: 700; line-height: 1.3; }
+h3 { font-size: 1.05rem; font-weight: 600; line-height: 1.3; }
+p  { line-height: 1.6; }
+
+.label-sm {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--c-text3);
+}
+
+/* ========================================================
+   LAYOUT — HEADER + NAV + MAIN
+   ======================================================== */
+#app-header {
+  position: sticky;
+  top: 0;
+  z-index: 90;
+  background: var(--c-bg2);
+  border-bottom: 1px solid var(--c-border);
+  display: flex;
+  align-items: center;
+  padding-top: calc(env(safe-area-inset-top, 0px) + 8px);
+  padding-bottom: 8px;
+  padding-left: 16px;
+  padding-right: 16px;
+  gap: 12px;
+  min-height: calc(var(--header-h) + env(safe-area-inset-top, 0px));
+}
+
+#app-header h1 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--c-accent);
+  flex: 1;
+}
+
+.header-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+}
+
+.header-stat .val {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--c-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.header-stat .lbl {
+  font-size: 0.65rem;
+  color: var(--c-text3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+#bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 90;
+  background: var(--c-bg2);
+  border-top: 1px solid var(--c-border);
+  height: var(--nav-h);
+  display: flex;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.nav-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  color: var(--c-text3);
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  padding: 6px 4px;
+  transition: color 0.15s;
+  min-height: 48px;
+}
+
+.nav-btn svg { width: 22px; height: 22px; stroke-width: 1.8; }
+
+.nav-btn.active {
+  color: var(--c-accent);
+}
+
+.nav-btn:hover:not(.active) { color: var(--c-text2); }
+
+#main-content {
+  flex: 1;
+  padding-bottom: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px) + 16px);
+  overflow-y: auto;
+}
+
+.screen { display: none; }
+.screen.active { display: block; }
+
+/* ========================================================
+   CARDS
+   ======================================================== */
+.card {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-lg);
+  padding: 16px;
+  margin: 0 16px 12px;
+}
+
+.card-tight { padding: 12px 14px; }
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+/* ========================================================
+   BUTTONS
+   ======================================================== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 12px 18px;
+  border-radius: var(--r);
+  border: none;
+  font-size: 0.9rem;
+  font-weight: 600;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.1s;
+  min-height: 48px;
+  white-space: nowrap;
+}
+.btn:active { transform: scale(0.97); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.btn-primary  { background: var(--c-accent); color: #fff; }
+.btn-primary:hover { background: var(--c-accent2); }
+
+.btn-secondary { background: var(--c-surface2); color: var(--c-text); border: 1px solid var(--c-border2); }
+.btn-secondary:hover { border-color: var(--c-accent); }
+
+.btn-danger  { background: var(--c-red-dim); color: var(--c-red); border: 1px solid var(--c-red); }
+.btn-danger:hover { background: var(--c-red); color: #fff; }
+
+.btn-ghost   { background: transparent; color: var(--c-text2); border: 1px solid var(--c-border); }
+.btn-ghost:hover { border-color: var(--c-border2); color: var(--c-text); }
+
+.btn-amber   { background: var(--c-amber-dim); color: var(--c-amber); border: 1px solid var(--c-amber); }
+.btn-amber:hover { background: var(--c-amber); color: #000; }
+
+.btn-sm { padding: 8px 12px; font-size: 0.8rem; min-height: 38px; }
+.btn-lg { padding: 16px 24px; font-size: 1rem; min-height: 56px; width: 100%; }
+.btn-icon { padding: 10px; min-height: 44px; min-width: 44px; border-radius: var(--r); }
+
+.btn-row {
+  display: flex;
+  gap: 10px;
+  padding: 0 16px;
+  margin-bottom: 12px;
+}
+.btn-row .btn { flex: 1; }
+
+/* ========================================================
+   FORM ELEMENTS
+   ======================================================== */
+.form-group {
+  margin-bottom: 14px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--c-text2);
+  margin-bottom: 6px;
+}
+
+.form-group .required-mark {
+  color: var(--c-red);
+  margin-left: 2px;
+}
+
+input[type="text"],
+input[type="number"],
+input[type="date"],
+input[type="time"],
+textarea,
+select {
+  width: 100%;
+  background: var(--c-bg3);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r);
+  padding: 12px 14px;
+  font-size: 1rem;
+  font-family: var(--font);
+  color: var(--c-text);
+  appearance: none;
+  -webkit-appearance: none;
+  transition: border-color 0.15s;
+  min-height: 48px;
+}
+
+input:focus, textarea:focus, select:focus {
+  border-color: var(--c-accent);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(34,197,94,0.18);
+}
+
+input::placeholder, textarea::placeholder { color: var(--c-text3); }
+
+textarea { min-height: 80px; resize: vertical; line-height: 1.5; }
+
+select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%2394a3b8' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  padding-right: 36px;
+  cursor: pointer;
+}
+
+.input-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+@media (min-width: 480px) {
+  .input-row {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.photo-picker {
+  width: 100%;
+  border: 1.5px dashed var(--c-border2);
+  border-radius: var(--r);
+  padding: 20px;
+  text-align: center;
+  cursor: pointer;
+  background: var(--c-bg3);
+  transition: border-color 0.15s, background 0.15s;
+  min-height: 80px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  position: relative;
+}
+
+.photo-picker:hover { border-color: var(--c-accent); background: rgba(34,197,94,0.05); }
+
+.photo-picker input[type="file"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  width: 100%;
+  height: 100%;
+  min-height: unset;
+  border: none;
+  background: none;
+  padding: 0;
+}
+
+.photo-picker-text { font-size: 0.85rem; color: var(--c-text2); }
+.photo-picker-sub  { font-size: 0.75rem; color: var(--c-text3); }
+
+.photo-thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.photo-thumb {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--c-border);
+}
+
+.photo-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.photo-thumb-remove {
+  position: absolute;
+  top: 3px; right: 3px;
+  width: 20px; height: 20px;
+  background: rgba(0,0,0,0.75);
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  font-size: 11px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+/* Validation error */
+.field-error {
+  font-size: 0.75rem;
+  color: var(--c-red);
+  margin-top: 4px;
+  display: none;
+}
+.field-error.visible { display: block; }
+input.invalid, textarea.invalid, select.invalid {
+  border-color: var(--c-red);
+}
+
+/* ========================================================
+   SECTION HEADER (screen-level)
+   ======================================================== */
+.screen-section {
+  padding: 16px 16px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.screen-section h2 { font-size: 1.1rem; }
+
+/* ========================================================
+   BEST 5 BAG — TODAY SCREEN
+   ======================================================== */
+#bag-summary-card {
+  background: var(--c-bg2);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-lg);
+  margin: 12px 16px 0;
+  overflow: hidden;
+}
+
+.bag-total-bar {
+  background: var(--c-accent-dim);
+  border-bottom: 1px solid rgba(34,197,94,0.25);
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.bag-total-bar .total-weight {
+  font-size: 1.8rem;
+  font-weight: 800;
+  color: var(--c-accent);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.bag-total-bar .total-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--c-text2);
+  margin-top: 2px;
+}
+
+.bag-stats {
+  display: flex;
+  gap: 2px;
+  font-size: 0.8rem;
+  color: var(--c-text2);
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.bag-fish-list {
+  padding: 8px 12px;
+}
+
+.bag-fish-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 4px;
+  border-bottom: 1px solid var(--c-border);
+}
+
+.bag-fish-row:last-child { border-bottom: none; }
+
+.fish-rank {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--c-text3);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  min-width: 44px;
+}
+
+.fish-rank.biggest { color: var(--c-amber); }
+
+.fish-weight-big {
+  font-size: 1.1rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  flex: 1;
+}
+
+.fish-details-sm {
+  font-size: 0.75rem;
+  color: var(--c-text3);
+  flex: 2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fish-replace-btn {
+  background: var(--c-surface2);
+  border: 1px solid var(--c-border);
+  color: var(--c-text2);
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 34px;
+  white-space: nowrap;
+}
+
+.fish-replace-btn:hover { border-color: var(--c-red); color: var(--c-red); }
+
+.bag-empty-slot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 4px;
+  border-bottom: 1px solid var(--c-border);
+  opacity: 0.45;
+}
+.bag-empty-slot:last-child { border-bottom: none; }
+
+.empty-slot-rank {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--c-text3);
+  text-transform: uppercase;
+  min-width: 44px;
+}
+
+.empty-slot-dash {
+  font-size: 0.85rem;
+  color: var(--c-text3);
+  font-style: italic;
+}
+
+/* PB badge */
+.pb-badge {
+  display: inline-block;
+  background: var(--c-amber-dim);
+  color: var(--c-amber);
+  border: 1px solid var(--c-amber);
+  border-radius: 4px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.notable-badge {
+  display: inline-block;
+  background: var(--c-blue-dim);
+  color: var(--c-blue);
+  border: 1px solid var(--c-blue);
+  border-radius: 4px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+/* ========================================================
+   FISH ENTRY CARDS (in current day list + history)
+   ======================================================== */
+.fish-card {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-lg);
+  margin: 0 16px 10px;
+  overflow: hidden;
+}
+
+.fish-card.in-bag {
+  border-color: rgba(34,197,94,0.35);
+}
+
+.fish-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px 10px;
+}
+
+.fish-card-weight {
+  font-size: 1.3rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--c-text);
+}
+
+.fish-card-meta {
+  flex: 1;
+  overflow: hidden;
+}
+
+.fish-card-meta-row {
+  font-size: 0.78rem;
+  color: var(--c-text2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fish-card-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.fish-card-body {
+  padding: 0 14px 12px;
+  font-size: 0.8rem;
+  color: var(--c-text2);
+}
+
+.fish-card-body .notes-text {
+  margin-top: 6px;
+  font-style: italic;
+  color: var(--c-text3);
+}
+
+/* ========================================================
+   SORT + FILTER BAR
+   ======================================================== */
+.sort-filter-bar {
+  display: flex;
+  gap: 8px;
+  padding: 0 16px 10px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.sort-filter-bar::-webkit-scrollbar { display: none; }
+
+.sort-filter-bar select {
+  min-height: 40px;
+  font-size: 0.82rem;
+  padding: 8px 32px 8px 10px;
+  flex-shrink: 0;
+  width: auto;
+  min-width: 130px;
+}
+
+.filter-chip {
+  flex-shrink: 0;
+  padding: 8px 14px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border: 1px solid var(--c-border2);
+  background: var(--c-surface);
+  color: var(--c-text2);
+  cursor: pointer;
+  white-space: nowrap;
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.filter-chip.active {
+  background: var(--c-accent-dim);
+  border-color: var(--c-accent);
+  color: var(--c-accent);
+}
+
+/* ========================================================
+   SAVED DAY CARDS + HISTORY CARDS
+   ======================================================== */
+.day-card {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-lg);
+  margin: 0 16px 12px;
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.day-card:hover { border-color: var(--c-border2); }
+
+.day-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.day-card-title {
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--c-text);
+}
+
+.day-card-date {
+  font-size: 0.78rem;
+  color: var(--c-text3);
+  margin-top: 2px;
+}
+
+.day-card-bag-weight {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: var(--c-accent);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.day-card-bag-label {
+  font-size: 0.65rem;
+  color: var(--c-text3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  text-align: right;
+}
+
+.day-card-stats {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.day-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.day-stat .dv {
+  font-size: 0.9rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.day-stat .dl {
+  font-size: 0.65rem;
+  color: var(--c-text3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* ========================================================
+   BIG FISH + BAG HISTORY CARDS
+   ======================================================== */
+.record-card {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-lg);
+  margin: 0 16px 12px;
+  overflow: hidden;
+}
+
+.record-card-photo {
+  width: 100%;
+  height: 140px;
+  object-fit: cover;
+  display: block;
+  background: var(--c-bg3);
+}
+
+.record-card-body {
+  padding: 12px 14px;
+}
+
+.record-card-weight {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--c-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.record-card-location {
+  font-size: 0.82rem;
+  color: var(--c-text2);
+  margin-top: 2px;
+}
+
+.record-card-date {
+  font-size: 0.75rem;
+  color: var(--c-text3);
+}
+
+.record-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-top: 1px solid var(--c-border);
+  gap: 8px;
+}
+
+/* Bag weights display */
+.bag-weights-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.bag-weight-pill {
+  background: var(--c-bg3);
+  border: 1px solid var(--c-border);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--c-text);
+}
+
+.bag-weight-pill.biggest { border-color: var(--c-amber); color: var(--c-amber); }
+
+/* ========================================================
+   MODAL / SHEET
+   ======================================================== */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  z-index: 200;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.modal-overlay.open { display: flex; }
+
+.modal-sheet {
+  background: var(--c-bg2);
+  border-radius: 20px 20px 0 0;
+  border-top: 1px solid var(--c-border);
+  width: 100%;
+  max-width: 520px;
+  max-height: 92vh;
+  overflow-y: auto;
+  padding: 0 0 calc(20px + env(safe-area-inset-bottom, 0px));
+  -webkit-overflow-scrolling: touch;
+}
+
+.modal-handle {
+  width: 36px;
+  height: 4px;
+  background: var(--c-border2);
+  border-radius: 2px;
+  margin: 14px auto 0;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 16px 8px;
+  border-bottom: 1px solid var(--c-border);
+  margin-bottom: 16px;
+}
+
+.modal-header h2 { font-size: 1.1rem; }
+
+.modal-close {
+  background: var(--c-surface2);
+  border: 1px solid var(--c-border);
+  color: var(--c-text2);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 38px;
+}
+
+.modal-body { padding: 0 16px; }
+
+/* ========================================================
+   CONFIRM DIALOG
+   ======================================================== */
+.confirm-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.8);
+  z-index: 300;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.confirm-overlay.open { display: flex; }
+
+.confirm-box {
+  background: var(--c-bg2);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-lg);
+  padding: 24px;
+  width: 100%;
+  max-width: 340px;
+  text-align: center;
+}
+
+.confirm-box h3 { margin-bottom: 10px; }
+.confirm-box p { font-size: 0.88rem; color: var(--c-text2); margin-bottom: 20px; line-height: 1.5; }
+.confirm-box .btn-row { padding: 0; }
+
+/* ========================================================
+   TOAST
+   ======================================================== */
+.toast {
+  position: fixed;
+  bottom: calc(var(--nav-h) + 16px + env(safe-area-inset-bottom,0px));
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--c-surface);
+  color: var(--c-text);
+  border: 1px solid var(--c-border2);
+  border-radius: 24px;
+  padding: 10px 20px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  white-space: nowrap;
+  z-index: 400;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s;
+}
+
+.toast.show { opacity: 1; }
+
+/* ========================================================
+   MISC / UTILS
+   ======================================================== */
+.divider {
+  height: 1px;
+  background: var(--c-border);
+  margin: 12px 16px;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--c-text3);
+}
+
+.empty-state svg {
+  width: 48px; height: 48px;
+  margin-bottom: 12px;
+  opacity: 0.35;
+}
+
+.empty-state h3 { margin-bottom: 8px; color: var(--c-text2); }
+.empty-state p { font-size: 0.88rem; line-height: 1.6; max-width: 260px; margin: 0 auto; }
+
+.tag-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0,0,0,0); white-space: nowrap; border-width: 0;
+}
+
+/* Day detail view within saved days */
+.detail-back-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--c-accent);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.detail-back-btn svg { width: 18px; height: 18px; }
+
+/* Session info strip */
+.session-info {
+  background: var(--c-bg3);
+  border-radius: var(--r);
+  padding: 10px 14px;
+  margin: 0 16px 12px;
+  font-size: 0.82rem;
+  color: var(--c-text2);
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.session-info strong { color: var(--c-text); }
+
+/* ========================================================
+   TODAY SCREEN specific
+   ======================================================== */
+.today-actions {
+  padding: 14px 16px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.today-actions-row {
+  display: flex;
+  gap: 10px;
+}
+
+.today-actions-row .btn { flex: 1; }
+
+/* All-time header stats chips */
+.alltime-strip {
+  display: flex;
+  gap: 6px;
+  padding: 10px 16px 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.alltime-strip::-webkit-scrollbar { display: none; }
+
+.alltime-chip {
+  flex-shrink: 0;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.alltime-chip .av {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--c-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.alltime-chip .al {
+  font-size: 0.62rem;
+  color: var(--c-text3);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
+/* Fish count badge on bag fish list */
+.in-bag-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  background: var(--c-accent-dim);
+  color: var(--c-accent);
+  border-radius: 4px;
+  padding: 2px 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Gallery */
+.photo-gallery {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  margin: 6px 0;
+}
+
+@media (min-width: 480px) {
+  .photo-gallery {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+  }
+}
+
+.photo-gallery img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+/* Lightbox */
+.lightbox {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.95);
+  z-index: 500;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  padding: 20px;
+}
+.lightbox.open { display: flex; }
+.lightbox img { max-width: 100%; max-height: 80vh; object-fit: contain; border-radius: 8px; }
+.lightbox-close {
+  position: absolute;
+  top: 20px; right: 20px;
+  background: rgba(255,255,255,0.15);
+  border: none; color: #fff;
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  font-size: 1.2rem;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* Checkbox toggle */
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 0;
+}
+
+.toggle-row label { font-size: 0.88rem; color: var(--c-text); }
+
+input[type="checkbox"].toggle {
+  appearance: none;
+  width: 44px;
+  height: 26px;
+  background: var(--c-surface2);
+  border: 1px solid var(--c-border2);
+  border-radius: 13px;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.2s;
+  min-height: unset;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+input[type="checkbox"].toggle::after {
+  content: '';
+  position: absolute;
+  width: 20px; height: 20px;
+  background: var(--c-text3);
+  border-radius: 50%;
+  top: 2px; left: 2px;
+  transition: left 0.2s, background 0.2s;
+}
+
+input[type="checkbox"].toggle:checked {
+  background: var(--c-accent);
+  border-color: var(--c-accent);
+}
+
+input[type="checkbox"].toggle:checked::after {
+  left: 20px;
+  background: #fff;
+}
+
+/* ========================================================
+   MOBILE-FIRST RESPONSIVE OVERRIDES
+   ======================================================== */
+
+/* Base font bump for outdoor readability */
+html { font-size: 17px; }
+
+/* Ensure no horizontal overflow anywhere */
+*, *::before, *::after { max-width: 100%; }
+img, video { max-width: 100%; height: auto; }
+
+/* Header — tighter on small screens */
+#app-header { padding: 0 12px; }
+.app-title { font-size: 1.1rem; }
+
+/* Main content — safe padding from edges */
+#main-content { padding-bottom: calc(var(--nav-h) + env(safe-area-inset-bottom, 16px) + 8px); }
+
+/* Screen sections — more breathing room */
+.screen-section { padding: 14px 14px 6px; flex-wrap: wrap; gap: 8px; }
+.screen-section h2 { font-size: 1.15rem; }
+
+/* Buttons — always thumb-friendly */
+.btn { min-height: 50px; font-size: 1rem; padding: 12px 18px; }
+.btn-sm { min-height: 44px; font-size: 0.9rem; padding: 10px 14px; }
+.btn-icon { min-height: 48px; min-width: 48px; }
+
+/* Form labels — bigger for readability */
+.form-group { margin-bottom: 16px; }
+.form-group label { font-size: 0.9rem; margin-bottom: 8px; }
+
+/* Inputs — taller touch targets */
+input[type="text"],
+input[type="number"],
+input[type="date"],
+input[type="time"],
+textarea,
+select {
+  min-height: 52px;
+  font-size: 1rem;
+  padding: 13px 14px;
+}
+
+/* Sort/filter bar — bigger chips and selects */
+.sort-filter-bar { padding: 0 12px 12px; gap: 8px; }
+.sort-filter-bar select { min-height: 46px; font-size: 0.9rem; min-width: 120px; }
+.filter-chip { min-height: 44px; font-size: 0.85rem; padding: 10px 16px; }
+
+/* Fish card — more tap-friendly layout */
+.fish-card-header { padding: 12px 14px; gap: 10px; }
+.fish-card-weight { font-size: 1.6rem; }
+.fish-card-meta-row { font-size: 0.85rem; white-space: normal; }
+.fish-card-actions { gap: 8px; }
+.fish-card-actions .btn-icon { min-height: 44px; min-width: 44px; }
+.fish-card-body { font-size: 0.88rem; padding: 0 14px 14px; }
+
+/* Bag summary card — comfortable spacing */
+.bag-total-bar { padding: 14px 16px; }
+.bag-total-bar .total-weight { font-size: 2rem; }
+.bag-total-bar .total-label { font-size: 0.75rem; }
+.bag-fish-list { padding: 8px 14px 4px; }
+.bag-fish-row { padding: 8px 0; min-height: 44px; }
+
+/* History cards — readable at a glance */
+.history-card { margin: 0 12px 10px; }
+.day-card { margin: 0 12px 10px; }
+
+/* Nav labels — slightly bigger */
+.nav-btn { font-size: 0.7rem; }
+.nav-btn svg { width: 24px; height: 24px; }
+
+/* Photo thumbs — bigger on mobile */
+.photo-thumb { width: 80px; height: 80px; }
+
+/* Label-sm — don't go too tiny */
+.label-sm { font-size: 0.72rem; }
+
+/* Modal / sheet — full width on mobile */
+.modal, .sheet, .bottom-sheet {
+  width: 100% !important;
+  max-width: 100% !important;
+  border-radius: 16px 16px 0 0;
+}
+
+/* Stack any remaining inline flex rows vertically on very small screens */
+@media (max-width: 360px) {
+  .bag-total-bar { flex-direction: column; align-items: flex-start; gap: 4px; }
+  .screen-section { flex-direction: column; align-items: flex-start; }
+}
+
+/* Tablet+ enhancements — restore desktop feel */
+@media (min-width: 600px) {
+  html { font-size: 16px; }
+  .btn { min-height: 44px; font-size: 0.95rem; }
+  .btn-sm { min-height: 38px; }
+  input[type="text"],
+  input[type="number"],
+  input[type="date"],
+  input[type="time"],
+  textarea,
+  select { min-height: 48px; }
+  .sort-filter-bar select { min-height: 40px; font-size: 0.82rem; }
+  .filter-chip { min-height: 40px; font-size: 0.8rem; }
+  .history-card { margin: 0 16px 10px; }
+  .day-card { margin: 0 16px 10px; }
+  .screen-section { padding: 16px 16px 8px; }
+  .photo-thumb { width: 72px; height: 72px; }
+}
+</style>
+</head>
+<body>
+
+<!-- Skip navigation for accessibility -->
+<a href="#main-content" class="sr-only" style="position:absolute;top:6px;left:6px;background:var(--c-accent);color:#000;padding:8px 14px;border-radius:6px;font-weight:700;z-index:9999;display:block;">Skip to content</a>
+
+<!-- ============================================================
+     APP HEADER
+     ============================================================ -->
+<header id="app-header" role="banner">
+  <h1>Bass Tracker</h1>
+  <div class="header-stat" aria-label="All-time biggest fish">
+    <span class="val" id="hdr-biggest-fish">--</span>
+    <span class="lbl">PB Fish</span>
+  </div>
+  <div class="header-stat" aria-label="All-time heaviest bag">
+    <span class="val" id="hdr-biggest-bag">--</span>
+    <span class="lbl">PB Bag</span>
+  </div>
+</header>
+
+<!-- ============================================================
+     MAIN CONTENT AREA
+     ============================================================ -->
+<main id="main-content" role="main">
+
+  <!-- ── TODAY SCREEN ─────────────────────────────────── -->
+  <section id="screen-today" class="screen active" aria-labelledby="nav-today-label">
+
+    <!-- Session info bar -->
+    <div class="session-info" id="today-session-info" aria-live="polite"></div>
+
+    <!-- Best 5 Bag -->
+    <div id="bag-summary-card" aria-label="Current best 5 bag">
+      <div class="bag-total-bar">
+        <div>
+          <div class="total-weight" id="bag-total-weight" aria-live="polite">0.00 lb</div>
+          <div class="total-label">Best 5 Bag Weight</div>
+        </div>
+        <div class="bag-stats">
+          <span id="bag-fish-count" aria-live="polite">0 / 5 fish</span>
+          <span id="bag-avg-weight" aria-live="polite"></span>
+        </div>
+      </div>
+      <div class="bag-fish-list" id="bag-fish-list" aria-label="Best 5 fish list" role="list">
+        <!-- Filled by JS -->
+      </div>
+    </div>
+
+    <!-- Quick actions -->
+    <div class="today-actions">
+      <button class="btn btn-primary btn-lg" onclick="openAddFishModal()" aria-label="Add new fish catch">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="20" height="20"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+        Add Fish
+      </button>
+      <div class="today-actions-row">
+        <button class="btn btn-secondary" onclick="openSaveDayModal()" aria-label="Save this fishing day">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="18" height="18"><path stroke-linecap="round" stroke-linejoin="round" d="M17 3H7a2 2 0 00-2 2v14l7-3 7 3V5a2 2 0 00-2-2z"/></svg>
+          Save Day
+        </button>
+        <button class="btn btn-secondary" onclick="confirmStartNewDay()" aria-label="Start a new fishing day">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="18" height="18"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+          New Day
+        </button>
+      </div>
+    </div>
+
+    <!-- All fish caught today -->
+    <div class="screen-section" style="margin-top:14px;">
+      <h2>All Fish Today</h2>
+      <span id="today-fish-count" class="label-sm" aria-live="polite"></span>
+    </div>
+
+    <div id="today-fish-list" aria-label="All fish caught today" role="list">
+      <!-- Filled by JS -->
+    </div>
+
+  </section>
+
+  <!-- ── SAVED DAYS / TRIP HISTORY SCREEN ───────────────── -->
+  <section id="screen-history" class="screen" aria-labelledby="nav-history-label">
+    <div id="history-list-view">
+      <div class="screen-section">
+        <h2>Trip History</h2>
+        <span id="history-count" class="label-sm" aria-live="polite"></span>
+      </div>
+
+      <div class="sort-filter-bar" role="group" aria-label="Sort and filter saved days">
+        <select id="history-sort" aria-label="Sort saved days" onchange="renderHistory()">
+          <option value="newest">Newest First</option>
+          <option value="oldest">Oldest First</option>
+          <option value="heaviest-bag">Heaviest Bag</option>
+          <option value="biggest-fish">Biggest Fish</option>
+          <option value="most-fish">Most Fish</option>
+          <option value="location">By Location</option>
+        </select>
+        <input type="text" id="history-filter-loc" placeholder="Filter location..." aria-label="Filter by location" oninput="renderHistory()" style="min-width:130px;min-height:40px;font-size:0.82rem;padding:8px 10px;">
+      </div>
+
+      <div id="history-list" role="list" aria-label="Saved fishing days">
+        <!-- Filled by JS -->
+      </div>
+    </div>
+
+    <!-- Day detail view (shown when tapping a saved day) -->
+    <div id="day-detail-view" style="display:none;">
+      <button class="detail-back-btn" onclick="closeDayDetail()" aria-label="Back to trip history">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+        Trip History
+      </button>
+      <div id="day-detail-content"></div>
+    </div>
+  </section>
+
+  <!-- ── BIG FISH HISTORY SCREEN ────────────────────────── -->
+  <section id="screen-fish" class="screen" aria-labelledby="nav-fish-label">
+    <div class="screen-section">
+      <h2>Big Fish Log</h2>
+      <button class="btn btn-primary btn-sm" onclick="openBigFishModal(null)" aria-label="Log a big fish">Add Entry</button>
+    </div>
+
+    <div class="sort-filter-bar" role="group" aria-label="Sort and filter fish records">
+      <select id="fish-sort" aria-label="Sort fish records" onchange="renderBigFish()">
+        <option value="newest">Newest</option>
+        <option value="oldest">Oldest</option>
+        <option value="heaviest">Heaviest</option>
+        <option value="lightest">Lightest</option>
+        <option value="location">By Location</option>
+      </select>
+      <button class="filter-chip" id="fish-filter-pb" onclick="toggleFilter('fish-pb')" aria-pressed="false" aria-label="Show only personal bests">PB Only</button>
+      <button class="filter-chip" id="fish-filter-notable" onclick="toggleFilter('fish-notable')" aria-pressed="false" aria-label="Show only notable fish">Notable</button>
+      <button class="filter-chip" id="fish-filter-6lb" onclick="toggleFilter('fish-6lb')" aria-pressed="false" aria-label="Show only fish 6 lbs or heavier">6+ lb</button>
+      <button class="filter-chip" id="fish-filter-7lb" onclick="toggleFilter('fish-7lb')" aria-pressed="false" aria-label="Show only fish 7 lbs or heavier">7+ lb</button>
+      <input type="text" id="fish-filter-loc" placeholder="Location..." aria-label="Filter by location" oninput="renderBigFish()" style="min-width:110px;min-height:40px;font-size:0.82rem;padding:8px 10px;">
+    </div>
+
+    <div id="fish-list" role="list" aria-label="Big fish records">
+      <!-- Filled by JS -->
+    </div>
+  </section>
+
+  <!-- ── BIG BAG HISTORY SCREEN ─────────────────────────── -->
+  <section id="screen-bags" class="screen" aria-labelledby="nav-bags-label">
+    <div class="screen-section">
+      <h2>Bag History</h2>
+      <button class="btn btn-primary btn-sm" onclick="openSaveBagModal()" aria-label="Save a completed bag">Save Bag</button>
+    </div>
+
+    <div class="sort-filter-bar" role="group" aria-label="Sort bag records">
+      <select id="bag-sort" aria-label="Sort bag records" onchange="renderBagHistory()">
+        <option value="newest">Newest</option>
+        <option value="oldest">Oldest</option>
+        <option value="heaviest">Heaviest Total</option>
+        <option value="biggest-fish">Biggest Fish</option>
+        <option value="location">By Location</option>
+      </select>
+      <input type="text" id="bag-filter-loc" placeholder="Location..." aria-label="Filter bags by location" oninput="renderBagHistory()" style="min-width:110px;min-height:40px;font-size:0.82rem;padding:8px 10px;">
+    </div>
+
+    <div id="bag-list" role="list" aria-label="Saved bag records">
+      <!-- Filled by JS -->
+    </div>
+  </section>
+
+  <!-- ── SETTINGS SCREEN ──────────────────────────────── -->
+  <section id="screen-settings" class="screen" aria-labelledby="nav-settings-label">
+    <div class="screen-section">
+      <h2>Settings</h2>
+    </div>
+
+    <!-- GitHub Backup -->
+    <div style="margin:0 16px 12px;">
+      <div style="background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--r-lg);overflow:hidden;">
+        <div style="padding:14px 16px 10px;border-bottom:1px solid var(--c-border);">
+          <div style="font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--c-text3);margin-bottom:2px;">GitHub Auto-Backup</div>
+          <div style="font-size:0.82rem;color:var(--c-text2);line-height:1.5;">Your data backs up automatically every time you save a day. One-time setup.</div>
+          <div id="gh-status-row" style="margin-top:8px;font-size:0.82rem;font-weight:600;color:var(--c-text3);">Not configured</div>
+        </div>
+
+        <div style="padding:14px 16px;">
+          <div style="margin-bottom:12px;">
+            <label for="gh-token" style="display:block;font-size:0.8rem;font-weight:600;color:var(--c-text2);margin-bottom:6px;">Personal Access Token</label>
+            <input type="password" id="gh-token" placeholder="ghp_xxxxxxxxxxxx" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+              style="width:100%;background:var(--c-bg3);border:1px solid var(--c-border);border-radius:var(--r);padding:12px 14px;font-size:0.9rem;color:var(--c-text);font-family:var(--font-mono);">
+          </div>
+          <div style="margin-bottom:14px;">
+            <label for="gh-repo" style="display:block;font-size:0.8rem;font-weight:600;color:var(--c-text2);margin-bottom:6px;">Repository (username/repo-name)</label>
+            <input type="text" id="gh-repo" placeholder="yourname/bass-tracker-data" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+              style="width:100%;background:var(--c-bg3);border:1px solid var(--c-border);border-radius:var(--r);padding:12px 14px;font-size:0.9rem;color:var(--c-text);">
+          </div>
+          <button onclick="saveGHSettingsInline()" class="btn btn-primary" style="width:100%;margin-bottom:8px;">Save & Test Connection</button>
+          <button onclick="githubBackup(false)" class="btn btn-secondary" style="width:100%;margin-bottom:8px;">☁ Backup to GitHub Now</button>
+          <button onclick="githubRestore()" class="btn btn-secondary" style="width:100%;">↓ Restore from GitHub</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Local Backup -->
+    <div style="margin:0 16px 12px;">
+      <div style="background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--r-lg);overflow:hidden;">
+        <div style="padding:14px 16px 10px;border-bottom:1px solid var(--c-border);">
+          <div style="font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--c-text3);margin-bottom:2px;">Local Backup</div>
+          <div style="font-size:0.82rem;color:var(--c-text2);line-height:1.5;">Export a backup file to save locally or to iCloud Files as a manual fallback.</div>
+        </div>
+        <div style="padding:14px 16px;display:flex;flex-direction:column;gap:8px;">
+          <button onclick="exportData()" class="btn btn-secondary" style="width:100%;">Export Backup File</button>
+          <button onclick="importData()" class="btn btn-secondary" style="width:100%;">Import Backup File</button>
+        </div>
+      </div>
+    </div>
+
+    <div style="height:24px;"></div>
+  </section>
+
+</main>
+
+<!-- ============================================================
+     BOTTOM NAV
+     ============================================================ -->
+<nav id="bottom-nav" role="navigation" aria-label="Main navigation">
+  <button class="nav-btn active" id="nav-today" onclick="switchScreen('today')" aria-label="Today's fishing" aria-pressed="true">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+    <span id="nav-today-label">Today</span>
+  </button>
+  <button class="nav-btn" id="nav-history" onclick="switchScreen('history')" aria-label="Trip history" aria-pressed="false">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+    <span id="nav-history-label">Trips</span>
+  </button>
+  <button class="nav-btn" id="nav-fish" onclick="switchScreen('fish')" aria-label="Big fish log" aria-pressed="false">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></svg>
+    <span id="nav-fish-label">Fish Log</span>
+  </button>
+  <button class="nav-btn" id="nav-bags" onclick="switchScreen('bags')" aria-label="Bag history" aria-pressed="false">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"/></svg>
+    <span id="nav-bags-label">Bags</span>
+  </button>
+  <button class="nav-btn" id="nav-settings" onclick="switchScreen('settings')" aria-label="Settings" aria-pressed="false">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+    <span id="nav-settings-label">Settings</span>
+  </button>
+</nav>
+
+<!-- ============================================================
+     ADD FISH MODAL
+     ============================================================ -->
+<div class="modal-overlay" id="add-fish-modal" role="dialog" aria-modal="true" aria-labelledby="add-fish-modal-title" onclick="handleOverlayClick(event,'add-fish-modal')">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <h2 id="add-fish-modal-title">Add Fish Catch</h2>
+      <button class="modal-close" onclick="closeModal('add-fish-modal')" aria-label="Close add fish form">Cancel</button>
+    </div>
+    <div class="modal-body">
+      <form id="add-fish-form" novalidate onsubmit="return false;">
+
+        <div class="input-row">
+          <div class="form-group">
+            <label for="fish-weight">Weight (lb) <span class="required-mark" aria-hidden="true">*</span></label>
+            <input type="number" id="fish-weight" name="weight" step="0.01" min="0.01" max="30" placeholder="e.g. 4.25" inputmode="decimal" required aria-required="true" oninput="updateBagHint()">
+            <div class="field-error" id="fish-weight-err" role="alert">Enter a valid weight (0.01–30 lb)</div>
+            <div id="fish-bag-hint" style="font-size:0.82rem;margin-top:6px;min-height:18px;font-weight:500;"></div>
+          </div>
+          <div class="form-group">
+            <label for="fish-length">Length (in)</label>
+            <input type="number" id="fish-length" name="length" step="0.25" min="1" max="40" placeholder="optional" inputmode="decimal">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="fish-location">Lake / Location</label>
+          <input type="text" id="fish-location" name="location" placeholder="e.g. Lake Fork" autocomplete="off">
+        </div>
+
+        <div class="form-group">
+          <label for="fish-lure">Bait / Lure</label>
+          <input type="text" id="fish-lure" name="lure" placeholder="e.g. Ned Rig, Green Pumpkin" autocomplete="off">
+        </div>
+
+        <div class="form-group">
+          <label for="fish-notes">Notes</label>
+          <textarea id="fish-notes" name="notes" placeholder="Depth, structure, conditions..."></textarea>
+        </div>
+
+        <div class="form-group">
+          <label>Photos</label>
+          <div class="photo-picker" aria-label="Add photos">
+            <input type="file" id="fish-photos" accept="image/*" multiple aria-label="Select photos from camera or library">
+            <span aria-hidden="true" style="font-size:1.4rem; color:var(--c-text3);">+</span>
+            <span class="photo-picker-text">Tap to add photos</span>
+            <span class="photo-picker-sub">Camera or photo library</span>
+          </div>
+          <div class="photo-thumbs" id="fish-photo-previews"></div>
+        </div>
+
+        <div class="toggle-row" style="margin-bottom:16px;">
+          <label for="fish-is-pb">Mark as Personal Best</label>
+          <input type="checkbox" class="toggle" id="fish-is-pb" name="isPB">
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-lg" onclick="submitAddFish()">
+          Save Catch
+        </button>
+        <div style="height:8px;"></div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     SAVE DAY MODAL
+     ============================================================ -->
+<div class="modal-overlay" id="save-day-modal" role="dialog" aria-modal="true" aria-labelledby="save-day-modal-title" onclick="handleOverlayClick(event,'save-day-modal')">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <h2 id="save-day-modal-title">Save Fishing Day</h2>
+      <button class="modal-close" onclick="closeModal('save-day-modal')">Cancel</button>
+    </div>
+    <div class="modal-body">
+      <form id="save-day-form" novalidate onsubmit="return false;">
+
+        <div class="form-group">
+          <label for="day-date">Date <span class="required-mark" aria-hidden="true">*</span></label>
+          <input type="date" id="day-date" required aria-required="true">
+        </div>
+
+        <div class="form-group">
+          <label for="day-location">Lake / Location <span class="required-mark" aria-hidden="true">*</span></label>
+          <input type="text" id="day-location" placeholder="e.g. Sam Rayburn" required aria-required="true">
+          <div class="field-error" id="day-location-err" role="alert">Location is required</div>
+        </div>
+
+        <div class="form-group">
+          <label for="day-conditions">Weather / Conditions</label>
+          <input type="text" id="day-conditions" placeholder="e.g. Overcast, 68F, light wind">
+        </div>
+
+        <div class="form-group">
+          <label for="day-notes">Notes</label>
+          <textarea id="day-notes" placeholder="Patterns, tactics, highlights..."></textarea>
+        </div>
+
+        <div class="form-group">
+          <label>Photos</label>
+          <div class="photo-picker">
+            <input type="file" id="day-photos" accept="image/*" multiple aria-label="Select day photos">
+            <span aria-hidden="true" style="font-size:1.4rem; color:var(--c-text3);">+</span>
+            <span class="photo-picker-text">Tap to add photos</span>
+          </div>
+          <div class="photo-thumbs" id="day-photo-previews"></div>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-lg" onclick="submitSaveDay()">Save Day</button>
+        <div style="height:8px;"></div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     BIG FISH LOG MODAL
+     ============================================================ -->
+<div class="modal-overlay" id="big-fish-modal" role="dialog" aria-modal="true" aria-labelledby="big-fish-modal-title" onclick="handleOverlayClick(event,'big-fish-modal')">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <h2 id="big-fish-modal-title">Log Big Fish</h2>
+      <button class="modal-close" onclick="closeModal('big-fish-modal')">Cancel</button>
+    </div>
+    <div class="modal-body">
+      <form id="big-fish-form" novalidate onsubmit="return false;">
+        <input type="hidden" id="bf-edit-id">
+
+        <div class="input-row">
+          <div class="form-group">
+            <label for="bf-weight">Weight (lb) <span class="required-mark" aria-hidden="true">*</span></label>
+            <input type="number" id="bf-weight" step="0.01" min="0.01" max="30" placeholder="e.g. 7.12" inputmode="decimal" required>
+            <div class="field-error" id="bf-weight-err" role="alert">Enter a valid weight</div>
+          </div>
+          <div class="form-group">
+            <label for="bf-length">Length (in)</label>
+            <input type="number" id="bf-length" step="0.25" min="1" max="40" placeholder="optional" inputmode="decimal">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="bf-date">Date <span class="required-mark" aria-hidden="true">*</span></label>
+          <input type="date" id="bf-date" required>
+        </div>
+
+        <div class="form-group">
+          <label for="bf-location">Lake / Location</label>
+          <input type="text" id="bf-location" placeholder="e.g. Toledo Bend">
+        </div>
+
+        <div class="form-group">
+          <label for="bf-lure">Bait / Lure</label>
+          <input type="text" id="bf-lure" placeholder="e.g. Swimbait">
+        </div>
+
+        <div class="form-group">
+          <label for="bf-notes">Notes</label>
+          <textarea id="bf-notes" placeholder="Story, conditions, depth..."></textarea>
+        </div>
+
+        <div class="form-group">
+          <label>Photos</label>
+          <div class="photo-picker">
+            <input type="file" id="bf-photos" accept="image/*" multiple aria-label="Select fish photos">
+            <span aria-hidden="true" style="font-size:1.4rem; color:var(--c-text3);">+</span>
+            <span class="photo-picker-text">Tap to add photos</span>
+          </div>
+          <div class="photo-thumbs" id="bf-photo-previews"></div>
+        </div>
+
+        <div class="toggle-row" style="margin-bottom:6px;">
+          <label for="bf-is-pb">Personal Best</label>
+          <input type="checkbox" class="toggle" id="bf-is-pb">
+        </div>
+        <div class="toggle-row" style="margin-bottom:16px;">
+          <label for="bf-is-notable">Notable Catch</label>
+          <input type="checkbox" class="toggle" id="bf-is-notable">
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-lg" onclick="submitBigFish()">Save Entry</button>
+        <div style="height:8px;"></div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     SAVE BAG MODAL
+     ============================================================ -->
+<div class="modal-overlay" id="save-bag-modal" role="dialog" aria-modal="true" aria-labelledby="save-bag-modal-title" onclick="handleOverlayClick(event,'save-bag-modal')">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <h2 id="save-bag-modal-title">Save Completed Bag</h2>
+      <button class="modal-close" onclick="closeModal('save-bag-modal')">Cancel</button>
+    </div>
+    <div class="modal-body">
+      <form id="save-bag-form" novalidate onsubmit="return false;">
+        <p style="font-size:0.85rem;color:var(--c-text2);margin-bottom:14px;">Enter the 5 fish weights for this bag. Leave unused slots blank.</p>
+
+        <div class="input-row">
+          <div class="form-group"><label for="bag-w1">Fish 1 (lb) <span class="required-mark">*</span></label><input type="number" id="bag-w1" step="0.01" min="0.01" max="30" inputmode="decimal" oninput="updateBagTotalPreview()"></div>
+          <div class="form-group"><label for="bag-w2">Fish 2 (lb)</label><input type="number" id="bag-w2" step="0.01" min="0.01" max="30" inputmode="decimal" oninput="updateBagTotalPreview()"></div>
+        </div>
+        <div class="input-row">
+          <div class="form-group"><label for="bag-w3">Fish 3 (lb)</label><input type="number" id="bag-w3" step="0.01" min="0.01" max="30" inputmode="decimal" oninput="updateBagTotalPreview()"></div>
+          <div class="form-group"><label for="bag-w4">Fish 4 (lb)</label><input type="number" id="bag-w4" step="0.01" min="0.01" max="30" inputmode="decimal" oninput="updateBagTotalPreview()"></div>
+        </div>
+        <div class="form-group" style="max-width:100%">
+          <label for="bag-w5">Fish 5 (lb)</label>
+          <input type="number" id="bag-w5" step="0.01" min="0.01" max="30" inputmode="decimal" oninput="updateBagTotalPreview()">
+        </div>
+
+        <div class="form-group">
+          <label for="bag-save-date">Date <span class="required-mark">*</span></label>
+          <input type="date" id="bag-save-date" required>
+        </div>
+
+        <div class="form-group">
+          <label for="bag-save-location">Lake / Location</label>
+          <input type="text" id="bag-save-location" placeholder="e.g. Guntersville">
+        </div>
+
+        <div class="form-group">
+          <label for="bag-save-lures">Lure Patterns</label>
+          <input type="text" id="bag-save-lures" placeholder="e.g. Spinnerbait, Texas Rig">
+        </div>
+
+        <div class="form-group">
+          <label for="bag-save-notes">Notes</label>
+          <textarea id="bag-save-notes" placeholder="Conditions, tournament, highlights..."></textarea>
+        </div>
+
+        <div class="form-group">
+          <label>Photos</label>
+          <div class="photo-picker">
+            <input type="file" id="bag-photos" accept="image/*" multiple aria-label="Select bag photos">
+            <span aria-hidden="true" style="font-size:1.4rem; color:var(--c-text3);">+</span>
+            <span class="photo-picker-text">Tap to add photos</span>
+          </div>
+          <div class="photo-thumbs" id="bag-photo-previews"></div>
+        </div>
+
+        <div id="bag-total-preview" style="background:var(--c-accent-dim);border:1px solid rgba(34,197,94,0.3);border-radius:var(--r);padding:12px 14px;margin-bottom:14px;display:none;">
+          <div style="font-size:0.75rem;color:var(--c-text2);text-transform:uppercase;letter-spacing:0.07em;">Bag Total</div>
+          <div id="bag-total-preview-val" style="font-size:1.4rem;font-weight:800;color:var(--c-accent);"></div>
+        </div>
+
+        <div class="field-error" id="bag-weight-err" role="alert" style="margin-bottom:10px;">Enter at least one valid fish weight</div>
+
+        <button type="submit" class="btn btn-primary btn-lg" onclick="submitSaveBag()">Save Bag</button>
+        <div style="height:8px;"></div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     CONFIRM DIALOG
+     ============================================================ -->
+<div class="confirm-overlay" id="confirm-overlay" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title">
+  <div class="confirm-box">
+    <h3 id="confirm-title">Confirm</h3>
+    <p id="confirm-message">Are you sure?</p>
+    <div class="btn-row">
+      <button class="btn btn-ghost" onclick="closeConfirm()">Cancel</button>
+      <button class="btn btn-danger" id="confirm-ok-btn" onclick="confirmAction()">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+
+<!-- Lightbox -->
+<div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Photo viewer">
+  <button class="lightbox-close" onclick="closeLightbox()" aria-label="Close photo">&times;</button>
+  <img id="lightbox-img" src="" alt="Full size fish photo">
+</div>
+
+<!-- ============================================================
+     JAVASCRIPT
+     ============================================================ -->
+<script>
+/* ========================================================
+   DATA MODEL & STORAGE
+   ======================================================== */
+
+const STORAGE_KEYS = {
+  currentDay: 'bt_currentDay',
+  savedDays:  'bt_savedDays',
+  bigFish:    'bt_bigFish',
+  bigBags:    'bt_bigBags',
+};
+
+/* currentDay schema:
+{
+  date: string (ISO),
+  location: string,
+  conditions: string,
+  notes: string,
+  photos: string[] (base64),
+  fish: FishEntry[],
+}
+
+FishEntry: { id, weight, length, location, lure, notes, photos[], timestamp, isPB }
+SavedDay: { id, date, location, conditions, notes, photos[], fish[], best5[], bagWeight, biggestFish, savedAt }
+BigFish: { id, weight, length, date, location, lure, notes, photos[], isPB, isNotable }
+BigBag:  { id, date, location, weights[], total, lures, notes, photos[], savedAt }
+*/
+
+function loadData(key) {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : null;
+  } catch(e) { return null; }
+}
+
+function saveData(key, val) {
+  try {
+    localStorage.setItem(key, JSON.stringify(val));
+  } catch(e) {
+    showToast('Storage full — export a backup first.');
+  }
+}
+
+function uid() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2);
+}
+
+/* Load initial state */
+let currentDay = loadData(STORAGE_KEYS.currentDay) || newCurrentDay();
+let savedDays  = loadData(STORAGE_KEYS.savedDays)  || [];
+let bigFish    = loadData(STORAGE_KEYS.bigFish)    || [];
+let bigBags    = loadData(STORAGE_KEYS.bigBags)    || [];
+
+function newCurrentDay() {
+  return {
+    date: todayISO(),
+    location: '',
+    conditions: '',
+    notes: '',
+    photos: [],
+    fish: [],
+  };
+}
+
+function todayISO() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function persist() {
+  saveData(STORAGE_KEYS.currentDay, currentDay);
+  saveData(STORAGE_KEYS.savedDays,  savedDays);
+  saveData(STORAGE_KEYS.bigFish,    bigFish);
+  saveData(STORAGE_KEYS.bigBags,    bigBags);
+}
+
+/* ========================================================
+   BEST 5 BAG LOGIC
+   ======================================================== */
+
+function getBest5(fishArray) {
+  const sorted = [...fishArray].sort((a, b) => b.weight - a.weight);
+  return sorted.slice(0, 5);
+}
+
+function getBagTotal(best5) {
+  return best5.reduce((sum, f) => sum + f.weight, 0);
+}
+
+function getAvgWeight(best5) {
+  if (!best5.length) return 0;
+  return getBagTotal(best5) / best5.length;
+}
+
+function wouldImprovesBag(weight, fishArray) {
+  const best5 = getBest5(fishArray);
+  if (best5.length < 5) return true;
+  const lightest = best5[best5.length - 1];
+  return weight > lightest.weight;
+}
+
+/* ========================================================
+   RENDER HELPERS
+   ======================================================== */
+
+function fmtWeight(w) {
+  return parseFloat(w).toFixed(2) + ' lb';
+}
+
+function fmtDate(iso) {
+  if (!iso) return '';
+  const [y, m, d] = iso.split('-');
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${months[+m-1]} ${+d}, ${y}`;
+}
+
+function escapHtml(str) {
+  return String(str || '')
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
+
+/* ========================================================
+   NAV / SCREEN SWITCHING
+   ======================================================== */
+
+function switchScreen(name) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => { b.classList.remove('active'); b.setAttribute('aria-pressed','false'); });
+
+  document.getElementById('screen-' + name).classList.add('active');
+  const navBtn = document.getElementById('nav-' + name);
+  navBtn.classList.add('active');
+  navBtn.setAttribute('aria-pressed','true');
+
+  if (name === 'history')  renderHistory();
+  if (name === 'fish')     renderBigFish();
+  if (name === 'bags')     renderBagHistory();
+  if (name === 'today')    renderToday();
+  if (name === 'settings') renderSettingsScreen();
+}
+
+/* ========================================================
+   TODAY SCREEN
+   ======================================================== */
+
+function renderToday() {
+  renderSessionInfo();
+  renderBag();
+  renderTodayFishList();
+  renderHeaderStats();
+}
+
+function renderSessionInfo() {
+  const el = document.getElementById('today-session-info');
+  const parts = [];
+  if (currentDay.date) parts.push(`<strong>${escapHtml(fmtDate(currentDay.date))}</strong>`);
+  if (currentDay.location) parts.push(escapHtml(currentDay.location));
+  if (currentDay.conditions) parts.push(escapHtml(currentDay.conditions));
+  el.innerHTML = parts.join(' &mdash; ') || '<em style="color:var(--c-text3)">No session info yet &mdash; tap Save Day to add details</em>';
+}
+
+function renderBag() {
+  const best5 = getBest5(currentDay.fish);
+  const total = getBagTotal(best5);
+  const avg   = getAvgWeight(best5);
+  const best5Ids = new Set(best5.map(f => f.id));
+
+  document.getElementById('bag-total-weight').textContent = fmtWeight(total);
+  document.getElementById('bag-fish-count').textContent = `${best5.length} / 5 fish`;
+  document.getElementById('bag-avg-weight').textContent = best5.length ? `Avg: ${fmtWeight(avg)}` : '';
+
+  const listEl = document.getElementById('bag-fish-list');
+  const slots = 5;
+  let html = '';
+
+  for (let i = 0; i < slots; i++) {
+    const fish = best5[i];
+    if (fish) {
+      const isBiggest = i === 0;
+      const details = [fish.lure, fish.location].filter(Boolean).join(' — ');
+      html += `
+        <div class="bag-fish-row" role="listitem">
+          <span class="fish-rank${isBiggest ? ' biggest' : ''}" aria-label="Fish ${i+1}${isBiggest ? ', biggest' : ''}">
+            #${i+1}${isBiggest ? '<br><small>BIG</small>' : ''}
+          </span>
+          <span class="fish-weight-big">${fmtWeight(fish.weight)}</span>
+          <span class="fish-details-sm" title="${escapHtml(details)}">${escapHtml(details)}</span>
+          ${fish.isPB ? '<span class="pb-badge" aria-label="Personal best">PB</span>' : ''}
+          <button class="fish-replace-btn" onclick="removeFishFromToday('${fish.id}')" aria-label="Remove ${fmtWeight(fish.weight)} fish from bag">Remove</button>
+        </div>`;
+    } else {
+      html += `<div class="bag-empty-slot" role="listitem" aria-label="Fish ${i+1} slot empty"><span class="empty-slot-rank">#${i+1}</span><span class="empty-slot-dash">empty</span></div>`;
+    }
+  }
+
+  listEl.innerHTML = html;
+}
+
+function renderTodayFishList() {
+  const el = document.getElementById('today-fish-list');
+  const countEl = document.getElementById('today-fish-count');
+  const best5 = getBest5(currentDay.fish);
+  const best5Ids = new Set(best5.map(f => f.id));
+
+  countEl.textContent = `${currentDay.fish.length} fish`;
+
+  if (!currentDay.fish.length) {
+    el.innerHTML = `<div class="empty-state">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+      <h3>No fish yet</h3>
+      <p>Tap "Add Fish" to log your first catch of the day.</p>
+    </div>`;
+    return;
+  }
+
+  const sorted = [...currentDay.fish].sort((a,b) => b.weight - a.weight);
+  el.innerHTML = sorted.map(fish => {
+    const inBag = best5Ids.has(fish.id);
+    const details = [fish.length ? `${fish.length}"` : '', fish.lure, fish.location].filter(Boolean).join(' · ');
+    return `
+      <div class="fish-card${inBag ? ' in-bag' : ''}" role="listitem" aria-label="${fmtWeight(fish.weight)} bass${inBag ? ', in best 5 bag' : ''}">
+        <div class="fish-card-header">
+          <div>
+            <div class="fish-card-weight">${fmtWeight(fish.weight)}</div>
+          </div>
+          <div class="fish-card-meta">
+            <div class="fish-card-meta-row">${escapHtml(details)}</div>
+            <div style="margin-top:4px;display:flex;gap:4px;flex-wrap:wrap;">
+              ${inBag ? '<span class="in-bag-label">In Bag</span>' : ''}
+              ${fish.isPB ? '<span class="pb-badge">PB</span>' : ''}
+            </div>
+          </div>
+          <div class="fish-card-actions">
+            <button class="btn btn-sm btn-ghost btn-icon" onclick="removeFishFromToday('${fish.id}')" aria-label="Delete this fish entry" title="Delete">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+            </button>
+          </div>
+        </div>
+        ${fish.notes ? `<div class="fish-card-body"><span class="notes-text">${escapHtml(fish.notes)}</span></div>` : ''}
+        ${fish.photos && fish.photos.length ? `<div class="photo-gallery" style="margin:0 14px 12px;">${fish.photos.slice(0,3).map(p=>`<img src="${p}" alt="Fish photo" onclick="openLightbox('${p}')" loading="lazy">`).join('')}</div>` : ''}
+      </div>`;
+  }).join('');
+}
+
+function removeFishFromToday(id) {
+  /* Intentional friction — removal is irreversible, happens on touchscreen in field conditions */
+  const fish = currentDay.fish.find(f => f.id === id);
+  const label = fish ? fmtWeight(fish.weight) : 'this fish';
+  showConfirm(
+    'Remove Fish?',
+    `Remove ${label} from today's bag? This cannot be undone.`,
+    () => {
+      currentDay.fish = currentDay.fish.filter(f => f.id !== id);
+      persist();
+      renderToday();
+      showToast('Fish removed');
+    }
+  );
+}
+
+function renderHeaderStats() {
+  // All-time biggest fish
+  let biggestFishWeight = 0;
+  bigFish.forEach(f => { if (f.weight > biggestFishWeight) biggestFishWeight = f.weight; });
+  savedDays.forEach(d => d.fish.forEach(f => { if (f.weight > biggestFishWeight) biggestFishWeight = f.weight; }));
+  currentDay.fish.forEach(f => { if (f.weight > biggestFishWeight) biggestFishWeight = f.weight; });
+
+  // All-time heaviest bag
+  let biggestBag = 0;
+  bigBags.forEach(b => { if (b.total > biggestBag) biggestBag = b.total; });
+  savedDays.forEach(d => { const t = getBagTotal(getBest5(d.fish)); if (t > biggestBag) biggestBag = t; });
+
+  document.getElementById('hdr-biggest-fish').textContent = biggestFishWeight ? fmtWeight(biggestFishWeight) : '--';
+  document.getElementById('hdr-biggest-bag').textContent = biggestBag ? fmtWeight(biggestBag) : '--';
+}
+
+/* ========================================================
+   ADD FISH MODAL
+   ======================================================== */
+
+let pendingFishPhotos = [];
+
+function openAddFishModal() {
+  pendingFishPhotos = [];
+  document.getElementById('add-fish-form').reset();
+  document.getElementById('fish-photo-previews').innerHTML = '';
+  document.getElementById('fish-bag-hint').textContent = '';  /* clear hint on open */
+  clearFieldError('fish-weight', 'fish-weight-err');
+  openModal('add-fish-modal');
+  setTimeout(() => document.getElementById('fish-weight').focus(), 200);
+}
+
+/* Live "would improve bag" hint while typing weight */
+function updateBagHint() {
+  const hint = document.getElementById('fish-bag-hint');
+  const val = parseFloat(document.getElementById('fish-weight').value);
+  if (!val || val <= 0) { hint.textContent = ''; return; }
+  const improves = wouldImprovesBag(val, currentDay.fish);
+  const best5 = getBest5(currentDay.fish);
+  if (best5.length < 5) {
+    hint.style.color = 'var(--c-accent)';
+    hint.textContent = `✓ Goes in your bag (${best5.length + 1} of 5)`;
+  } else if (improves) {
+    hint.style.color = 'var(--c-accent)';
+    hint.textContent = `✓ Would improve your bag`;
+  } else {
+    hint.style.color = 'var(--c-text3)';
+    hint.textContent = `Would not improve your current bag`;
+  }
+}
+
+document.getElementById('fish-photos').addEventListener('change', function(e) {
+  handlePhotoFiles(Array.from(e.target.files), pendingFishPhotos, 'fish-photo-previews');
+});
+
+function submitAddFish() {
+  const weightVal = parseFloat(document.getElementById('fish-weight').value);
+  if (!weightVal || weightVal <= 0 || weightVal > 30) {
+    showFieldError('fish-weight', 'fish-weight-err');
+    return;
+  }
+  clearFieldError('fish-weight', 'fish-weight-err');
+
+  const entry = {
+    id:       uid(),
+    weight:   weightVal,
+    length:   parseFloat(document.getElementById('fish-length').value) || null,
+    location: document.getElementById('fish-location').value.trim() || currentDay.location,
+    lure:     document.getElementById('fish-lure').value.trim(),
+    notes:    document.getElementById('fish-notes').value.trim(),
+    photos:   [...pendingFishPhotos],
+    isPB:     document.getElementById('fish-is-pb').checked,
+    timestamp: Date.now(),
+  };
+
+  // If no session location set, inherit
+  if (!currentDay.location && entry.location) {
+    currentDay.location = entry.location;
+  }
+
+  // Auto-set date if not set
+  if (!currentDay.date) currentDay.date = todayISO();
+
+  currentDay.fish.push(entry);
+  persist();
+
+  closeModal('add-fish-modal');
+  renderToday();
+
+  // Tell user if fish made the bag
+  const best5 = getBest5(currentDay.fish);
+  const inBag = best5.some(f => f.id === entry.id);
+  if (inBag) {
+    showToast(`${fmtWeight(entry.weight)} — in your best 5 bag!`);
+  } else {
+    showToast(`${fmtWeight(entry.weight)} logged`);
+  }
+}
+
+/* ========================================================
+   SAVE DAY MODAL
+   ======================================================== */
+
+let pendingDayPhotos = [];
+
+function openSaveDayModal() {
+  pendingDayPhotos = [];
+  document.getElementById('day-date').value = currentDay.date || todayISO();
+  document.getElementById('day-location').value = currentDay.location || '';
+  document.getElementById('day-conditions').value = currentDay.conditions || '';
+  document.getElementById('day-notes').value = currentDay.notes || '';
+  document.getElementById('day-photo-previews').innerHTML = '';
+  clearFieldError('day-location', 'day-location-err');
+  openModal('save-day-modal');
+}
+
+document.getElementById('day-photos').addEventListener('change', function(e) {
+  handlePhotoFiles(Array.from(e.target.files), pendingDayPhotos, 'day-photo-previews');
+});
+
+function submitSaveDay() {
+  const location = document.getElementById('day-location').value.trim();
+  if (!location) { showFieldError('day-location','day-location-err'); return; }
+  clearFieldError('day-location','day-location-err');
+
+  const date       = document.getElementById('day-date').value || todayISO();
+  const conditions = document.getElementById('day-conditions').value.trim();
+  const notes      = document.getElementById('day-notes').value.trim();
+
+  const best5      = getBest5(currentDay.fish);
+  const bagWeight  = getBagTotal(best5);
+  const biggestFish = currentDay.fish.length ? Math.max(...currentDay.fish.map(f=>f.weight)) : 0;
+
+  const savedDay = {
+    id:          uid(),
+    date,
+    location,
+    conditions,
+    notes,
+    photos:      [...pendingDayPhotos],
+    fish:        JSON.parse(JSON.stringify(currentDay.fish)),
+    best5:       JSON.parse(JSON.stringify(best5)),
+    bagWeight,
+    biggestFish,
+    fishCount:   currentDay.fish.length,
+    savedAt:     Date.now(),
+  };
+
+  savedDays.unshift(savedDay);
+
+  /* ── AUTO-PUSH BAG ──────────────────────────────────────
+     Push this trip's best-5 bag into bigBags automatically.
+     Uses a stable ID (savedDay.id + '_bag') to prevent
+     duplicates if the same trip is somehow saved twice.     */
+  if (best5.length > 0) {
+    const autoBagId = savedDay.id + '_bag';
+    const alreadyHasBag = bigBags.some(b => b.id === autoBagId);
+    if (!alreadyHasBag) {
+      const autoBag = {
+        id:       autoBagId,
+        date:     savedDay.date,
+        location: savedDay.location,
+        weights:  best5.map(f => f.weight).sort((a,b) => b - a),
+        total:    bagWeight,
+        lures:    '',
+        notes:    savedDay.notes || '',
+        photos:   [],
+        savedAt:  savedDay.savedAt,
+        autoAdded: true, // flag so user knows it came from a saved trip
+      };
+      bigBags.unshift(autoBag);
+    }
+  }
+
+  /* ── AUTO-PUSH QUALIFYING FISH (≥ 5.5 lb) ──────────────
+     Only fish 5.5 lbs or heavier are logged automatically.
+     Stable ID: savedDay.id + '_fish_' + originalFishId.
+     Skips any fish already present in bigFish.             */
+  const QUALIFYING_THRESHOLD = 5.5;
+  currentDay.fish.forEach(fish => {
+    if (fish.weight < QUALIFYING_THRESHOLD) return;
+    const autoFishId = savedDay.id + '_fish_' + fish.id;
+    const alreadyLogged = bigFish.some(f => f.id === autoFishId);
+    if (!alreadyLogged) {
+      bigFish.unshift({
+        id:        autoFishId,
+        weight:    fish.weight,
+        length:    fish.length || null,
+        date:      savedDay.date,
+        location:  savedDay.location,
+        lure:      fish.lure || '',
+        notes:     fish.notes || '',
+        photos:    fish.photos ? [...fish.photos] : [],
+        isPB:      fish.isPB || false,
+        isNotable: true, // 5.5+ lb qualifies as notable
+        autoAdded: true,
+      });
+    }
+  });
+
+  persist();
+  closeModal('save-day-modal');
+
+  /* Build informative toast: count what was actually auto-added */
+  const qualifyingCount = currentDay.fish.filter(f => f.weight >= QUALIFYING_THRESHOLD).length;
+  let toastMsg = 'Day saved!';
+  if (best5.length > 0 && qualifyingCount > 0) {
+    toastMsg = `Day saved · bag logged · ${qualifyingCount} fish auto-added`;
+  } else if (best5.length > 0) {
+    toastMsg = 'Day saved · bag logged to history';
+  } else if (qualifyingCount > 0) {
+    toastMsg = `Day saved · ${qualifyingCount} fish auto-added to log`;
+  }
+  showToast(toastMsg);
+  renderHeaderStats();
+  /* Auto-backup silently to GitHub after every save — fire and forget */
+  githubBackup(true);
+}
+
+/* ========================================================
+   START NEW DAY
+   ======================================================== */
+
+function confirmStartNewDay() {
+  if (!currentDay.fish.length) {
+    startNewDay();
+    return;
+  }
+  showConfirm(
+    'Start New Day?',
+    'Your current fish list will be cleared. Make sure you have saved today\'s data first.',
+    startNewDay
+  );
+}
+
+function startNewDay() {
+  /* Auto-save a draft of the current day before clearing, so data isn't silently lost */
+  if (currentDay.fish.length > 0) {
+    saveData('bt_lastDayDraft', { ...currentDay, draftSavedAt: Date.now() });
+  }
+  currentDay = newCurrentDay();
+  persist();
+  renderToday();
+  showToast('New day started');
+}
+
+/* ========================================================
+   TRIP HISTORY / SAVED DAYS
+   ======================================================== */
+
+function renderHistory() {
+  const sort = document.getElementById('history-sort').value;
+  const locFilter = document.getElementById('history-filter-loc').value.trim().toLowerCase();
+
+  let days = [...savedDays];
+
+  // Filter
+  if (locFilter) {
+    days = days.filter(d => (d.location || '').toLowerCase().includes(locFilter));
+  }
+
+  // Sort
+  switch(sort) {
+    case 'newest':       days.sort((a,b) => new Date(b.date) - new Date(a.date)); break;
+    case 'oldest':       days.sort((a,b) => new Date(a.date) - new Date(b.date)); break;
+    case 'heaviest-bag': days.sort((a,b) => b.bagWeight - a.bagWeight); break;
+    case 'biggest-fish': days.sort((a,b) => b.biggestFish - a.biggestFish); break;
+    case 'most-fish':    days.sort((a,b) => b.fishCount - a.fishCount); break;
+    case 'location':     days.sort((a,b) => (a.location||'').localeCompare(b.location||'')); break;
+  }
+
+  document.getElementById('history-count').textContent = `${days.length} trip${days.length !== 1 ? 's' : ''}`;
+
+  const el = document.getElementById('history-list');
+  if (!days.length) {
+    el.innerHTML = `<div class="empty-state">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+      <h3>No saved trips yet</h3>
+      <p>Go to Today and tap "Save Day" at the end of your session.</p>
+    </div>`;
+    return;
+  }
+
+  el.innerHTML = days.map(day => `
+    <div class="day-card" onclick="openDayDetail('${day.id}')" role="listitem" tabindex="0" aria-label="Trip to ${escapHtml(day.location)} on ${fmtDate(day.date)}, bag weight ${fmtWeight(day.bagWeight)}" onkeydown="if(event.key==='Enter')openDayDetail('${day.id}')">
+      <div class="day-card-header">
+        <div>
+          <div class="day-card-title">${escapHtml(day.location)}</div>
+          <div class="day-card-date">${fmtDate(day.date)}</div>
+        </div>
+        <div>
+          <div class="day-card-bag-weight">${fmtWeight(day.bagWeight)}</div>
+          <div class="day-card-bag-label">Best 5 Bag</div>
+        </div>
+      </div>
+      <div class="day-card-stats">
+        <div class="day-stat"><span class="dv">${day.fishCount}</span><span class="dl">Fish</span></div>
+        <div class="day-stat"><span class="dv">${day.biggestFish ? fmtWeight(day.biggestFish) : '--'}</span><span class="dl">Big Fish</span></div>
+        ${day.conditions ? `<div class="day-stat"><span class="dv">${escapHtml(day.conditions)}</span><span class="dl">Conditions</span></div>` : ''}
+      </div>
+    </div>`).join('');
+}
+
+function openDayDetail(id) {
+  const day = savedDays.find(d => d.id === id);
+  if (!day) return;
+
+  document.getElementById('history-list-view').style.display = 'none';
+  document.getElementById('day-detail-view').style.display = 'block';
+
+  const best5 = day.best5 || getBest5(day.fish);
+  const allSorted = [...day.fish].sort((a,b) => b.weight - a.weight);
+
+  document.getElementById('day-detail-content').innerHTML = `
+    <div style="padding:0 16px 10px;">
+      <h2 style="margin-bottom:4px;">${escapHtml(day.location)}</h2>
+      <div style="font-size:0.85rem;color:var(--c-text2);">${fmtDate(day.date)}${day.conditions ? ' &mdash; ' + escapHtml(day.conditions) : ''}</div>
+    </div>
+
+    ${day.photos && day.photos.length ? `<div class="photo-gallery" style="margin:0 16px 12px;">${day.photos.map(p=>`<img src="${p}" alt="Day photo" onclick="openLightbox('${p}')" loading="lazy">`).join('')}</div>` : ''}
+
+    <div class="card card-tight" style="background:var(--c-accent-dim);border-color:rgba(34,197,94,0.25);">
+      <div class="card-header" style="margin-bottom:8px;">
+        <h3>Best 5 Bag — ${fmtWeight(day.bagWeight)}</h3>
+      </div>
+      ${best5.map((f,i) => `
+        <div class="bag-fish-row" style="border-color:rgba(34,197,94,0.15);">
+          <span class="fish-rank${i===0?' biggest':''}">#${i+1}</span>
+          <span class="fish-weight-big">${fmtWeight(f.weight)}</span>
+          <span class="fish-details-sm">${escapHtml([f.lure,f.location].filter(Boolean).join(' — '))}</span>
+          ${f.isPB ? '<span class="pb-badge">PB</span>' : ''}
+        </div>`).join('')}
+      ${Array.from({length: 5-best5.length}).map((_,i)=>`<div class="bag-empty-slot"><span class="empty-slot-rank">#${best5.length+i+1}</span><span class="empty-slot-dash">empty</span></div>`).join('')}
+    </div>
+
+    ${day.notes ? `<div class="card card-tight"><p style="font-size:0.88rem;color:var(--c-text2);font-style:italic;">${escapHtml(day.notes)}</p></div>` : ''}
+
+    <div class="screen-section" style="padding-top:8px;"><h3>All Fish (${day.fish.length})</h3></div>
+    ${allSorted.map(fish => `
+      <div class="fish-card" role="listitem">
+        <div class="fish-card-header">
+          <div><div class="fish-card-weight">${fmtWeight(fish.weight)}</div></div>
+          <div class="fish-card-meta">
+            <div class="fish-card-meta-row">${escapHtml([fish.length ? fish.length+'"' : '', fish.lure, fish.location].filter(Boolean).join(' · '))}</div>
+            <div style="margin-top:4px;display:flex;gap:4px;">${fish.isPB ? '<span class="pb-badge">PB</span>' : ''}</div>
+          </div>
+        </div>
+        ${fish.notes ? `<div class="fish-card-body"><span class="notes-text">${escapHtml(fish.notes)}</span></div>` : ''}
+        ${fish.photos && fish.photos.length ? `<div class="photo-gallery" style="margin:0 14px 12px;">${fish.photos.slice(0,3).map(p=>`<img src="${p}" alt="Fish photo" onclick="openLightbox('${p}')" loading="lazy">`).join('')}</div>` : ''}
+      </div>`).join('')}
+
+    <div style="padding:8px 16px 4px;display:flex;gap:10px;">
+      <button class="btn btn-secondary" style="flex:1;" onclick="duplicateDayToToday('${day.id}')">Duplicate Session</button>
+      <button class="btn btn-danger" style="flex:1;" onclick="confirmDeleteDay('${day.id}')">Delete Trip</button>
+    </div>
+  `;
+}
+
+function closeDayDetail() {
+  document.getElementById('history-list-view').style.display = 'block';
+  document.getElementById('day-detail-view').style.display = 'none';
+}
+
+function duplicateDayToToday(id) {
+  const day = savedDays.find(d => d.id === id);
+  if (!day) return;
+  showConfirm(
+    'Duplicate Session?',
+    `This will set today's session info to match "${day.location}" and clear your current fish list.`,
+    () => {
+      currentDay = newCurrentDay();
+      currentDay.location   = day.location;
+      currentDay.conditions = day.conditions;
+      persist();
+      switchScreen('today');
+      showToast('Session duplicated — ready for new fish');
+    }
+  );
+}
+
+function confirmDeleteDay(id) {
+  showConfirm('Delete Trip?', 'This trip will be permanently deleted.', () => {
+    savedDays = savedDays.filter(d => d.id !== id);
+    persist();
+    closeDayDetail();
+    renderHistory();
+    showToast('Trip deleted');
+  });
+}
+
+/* ========================================================
+   BIG FISH LOG
+   ======================================================== */
+
+let pendingBfPhotos = [];
+const fishFilters = { pb: false, notable: false, w6: false, w7: false };
+
+function openBigFishModal(editId) {
+  pendingBfPhotos = [];
+  const form = document.getElementById('big-fish-form');
+  form.reset();
+  document.getElementById('bf-edit-id').value = editId || '';
+  document.getElementById('bf-photo-previews').innerHTML = '';
+  document.getElementById('big-fish-modal-title').textContent = editId ? 'Edit Fish Entry' : 'Log Big Fish';
+  clearFieldError('bf-weight','bf-weight-err');
+
+  if (editId) {
+    const fish = bigFish.find(f => f.id === editId);
+    if (fish) {
+      document.getElementById('bf-weight').value   = fish.weight;
+      document.getElementById('bf-length').value   = fish.length || '';
+      document.getElementById('bf-date').value     = fish.date;
+      document.getElementById('bf-location').value = fish.location || '';
+      document.getElementById('bf-lure').value     = fish.lure || '';
+      document.getElementById('bf-notes').value    = fish.notes || '';
+      document.getElementById('bf-is-pb').checked       = !!fish.isPB;
+      document.getElementById('bf-is-notable').checked  = !!fish.isNotable;
+      pendingBfPhotos = [...(fish.photos || [])];
+      renderPhotoThumbs(pendingBfPhotos, 'bf-photo-previews');
+    }
+  } else {
+    document.getElementById('bf-date').value = todayISO();
+  }
+
+  openModal('big-fish-modal');
+}
+
+document.getElementById('bf-photos').addEventListener('change', function(e) {
+  handlePhotoFiles(Array.from(e.target.files), pendingBfPhotos, 'bf-photo-previews');
+});
+
+function submitBigFish() {
+  const weightVal = parseFloat(document.getElementById('bf-weight').value);
+  if (!weightVal || weightVal <= 0 || weightVal > 30) {
+    showFieldError('bf-weight','bf-weight-err'); return;
+  }
+  clearFieldError('bf-weight','bf-weight-err');
+
+  const editId = document.getElementById('bf-edit-id').value;
+  const entry = {
+    id:        editId || uid(),
+    weight:    weightVal,
+    length:    parseFloat(document.getElementById('bf-length').value) || null,
+    date:      document.getElementById('bf-date').value || todayISO(),
+    location:  document.getElementById('bf-location').value.trim(),
+    lure:      document.getElementById('bf-lure').value.trim(),
+    notes:     document.getElementById('bf-notes').value.trim(),
+    photos:    [...pendingBfPhotos],
+    isPB:      document.getElementById('bf-is-pb').checked,
+    isNotable: document.getElementById('bf-is-notable').checked,
+  };
+
+  if (editId) {
+    const idx = bigFish.findIndex(f => f.id === editId);
+    if (idx > -1) bigFish[idx] = entry;
+  } else {
+    bigFish.unshift(entry);
+  }
+
+  persist();
+  closeModal('big-fish-modal');
+  renderBigFish();
+  renderHeaderStats();
+  showToast(editId ? 'Entry updated' : 'Big fish logged!');
+}
+
+function toggleFilter(key) {
+  if (key === 'fish-pb') {
+    fishFilters.pb = !fishFilters.pb;
+    const btn = document.getElementById('fish-filter-pb');
+    btn.classList.toggle('active', fishFilters.pb);
+    btn.setAttribute('aria-pressed', String(fishFilters.pb));
+  }
+  if (key === 'fish-notable') {
+    fishFilters.notable = !fishFilters.notable;
+    const btn = document.getElementById('fish-filter-notable');
+    btn.classList.toggle('active', fishFilters.notable);
+    btn.setAttribute('aria-pressed', String(fishFilters.notable));
+  }
+  /* NEW: weight threshold filters */
+  if (key === 'fish-6lb') {
+    fishFilters.w6 = !fishFilters.w6;
+    if (fishFilters.w6) fishFilters.w7 = false; // mutually exclusive
+    document.getElementById('fish-filter-6lb').classList.toggle('active', fishFilters.w6);
+    document.getElementById('fish-filter-6lb').setAttribute('aria-pressed', String(fishFilters.w6));
+    document.getElementById('fish-filter-7lb').classList.toggle('active', false);
+    document.getElementById('fish-filter-7lb').setAttribute('aria-pressed', 'false');
+  }
+  if (key === 'fish-7lb') {
+    fishFilters.w7 = !fishFilters.w7;
+    if (fishFilters.w7) fishFilters.w6 = false; // mutually exclusive
+    document.getElementById('fish-filter-7lb').classList.toggle('active', fishFilters.w7);
+    document.getElementById('fish-filter-7lb').setAttribute('aria-pressed', String(fishFilters.w7));
+    document.getElementById('fish-filter-6lb').classList.toggle('active', false);
+    document.getElementById('fish-filter-6lb').setAttribute('aria-pressed', 'false');
+  }
+  renderBigFish();
+}
+
+function renderBigFish() {
+  const sort    = document.getElementById('fish-sort').value;
+  const locFilt = document.getElementById('fish-filter-loc').value.trim().toLowerCase();
+  let fish = [...bigFish];
+
+  if (fishFilters.pb)      fish = fish.filter(f => f.isPB);
+  if (fishFilters.notable) fish = fish.filter(f => f.isNotable);
+  if (fishFilters.w7)      fish = fish.filter(f => f.weight >= 7);   /* NEW: 7+ lb */
+  else if (fishFilters.w6) fish = fish.filter(f => f.weight >= 6);   /* NEW: 6+ lb */
+  if (locFilt)             fish = fish.filter(f => (f.location||'').toLowerCase().includes(locFilt));
+
+  switch(sort) {
+    case 'newest':   fish.sort((a,b) => new Date(b.date) - new Date(a.date)); break;
+    case 'oldest':   fish.sort((a,b) => new Date(a.date) - new Date(b.date)); break;
+    case 'heaviest': fish.sort((a,b) => b.weight - a.weight); break;
+    case 'lightest': fish.sort((a,b) => a.weight - b.weight); break;
+    case 'location': fish.sort((a,b) => (a.location||'').localeCompare(b.location||'')); break;
+  }
+
+  const el = document.getElementById('fish-list');
+  if (!fish.length) {
+    el.innerHTML = `<div class="empty-state">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></svg>
+      <h3>No fish entries</h3>
+      <p>Bass 5.5 lb+ are added automatically when you save a day. You can also tap "Add Entry" to log a catch manually.</p>
+    </div>`;
+    return;
+  }
+
+  el.innerHTML = fish.map(f => {
+    const hasPhoto = f.photos && f.photos.length;
+    return `
+      <div class="record-card" role="listitem" aria-label="${fmtWeight(f.weight)} bass on ${fmtDate(f.date)}">
+        ${hasPhoto ? `<img class="record-card-photo" src="${f.photos[0]}" alt="Photo of ${fmtWeight(f.weight)} bass" onclick="openLightbox('${f.photos[0]}')" loading="lazy">` : ''}
+        <div class="record-card-body">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
+            <div>
+              <div class="record-card-weight">${fmtWeight(f.weight)}${f.length ? ` &middot; ${f.length}"` : ''}</div>
+              <div class="record-card-location">${escapHtml(f.location || 'No location')}</div>
+              <div class="record-card-date">${fmtDate(f.date)}${f.lure ? ' &mdash; ' + escapHtml(f.lure) : ''}</div>
+            </div>
+            <div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;">
+              ${f.isPB ? '<span class="pb-badge">PB</span>' : ''}
+              ${f.isNotable ? '<span class="notable-badge">Notable</span>' : ''}
+            </div>
+          </div>
+          ${f.notes ? `<p style="font-size:0.82rem;color:var(--c-text2);margin-top:8px;font-style:italic;">${escapHtml(f.notes)}</p>` : ''}
+          ${f.photos && f.photos.length > 1 ? `<div class="photo-gallery" style="margin-top:8px;">${f.photos.slice(1,4).map(p=>`<img src="${p}" alt="Fish photo" onclick="openLightbox('${p}')" loading="lazy">`).join('')}</div>` : ''}
+        </div>
+        <div class="record-card-footer">
+          <button class="btn btn-sm btn-ghost" onclick="openBigFishModal('${f.id}')" aria-label="Edit this fish entry">Edit</button>
+          <button class="btn btn-sm btn-danger" onclick="confirmDeleteBigFish('${f.id}')" aria-label="Delete this fish entry">Delete</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function confirmDeleteBigFish(id) {
+  showConfirm('Delete Fish Entry?', 'This record will be permanently removed.', () => {
+    bigFish = bigFish.filter(f => f.id !== id);
+    persist();
+    renderBigFish();
+    renderHeaderStats();
+    showToast('Entry deleted');
+  });
+}
+
+/* ========================================================
+   BAG HISTORY
+   ======================================================== */
+
+let pendingBagPhotos = [];
+
+function openSaveBagModal() {
+  pendingBagPhotos = [];
+  document.getElementById('save-bag-form').reset();
+  document.getElementById('bag-photo-previews').innerHTML = '';
+  document.getElementById('bag-total-preview').style.display = 'none';
+  document.getElementById('bag-save-date').value = todayISO();
+  clearFieldError('bag-w1','bag-weight-err');
+
+  // Pre-fill from current best 5
+  const best5 = getBest5(currentDay.fish);
+  ['bag-w1','bag-w2','bag-w3','bag-w4','bag-w5'].forEach((id,i) => {
+    document.getElementById(id).value = best5[i] ? best5[i].weight : '';
+  });
+  if (currentDay.location) document.getElementById('bag-save-location').value = currentDay.location;
+  updateBagTotalPreview();
+
+  openModal('save-bag-modal');
+}
+
+// Live preview of bag total
+['bag-w1','bag-w2','bag-w3','bag-w4','bag-w5'].forEach(id => {
+  document.getElementById(id).addEventListener('input', updateBagTotalPreview);
+});
+
+function updateBagTotalPreview() {
+  const vals = ['bag-w1','bag-w2','bag-w3','bag-w4','bag-w5']
+    .map(id => parseFloat(document.getElementById(id).value))
+    .filter(v => v > 0);
+  const total = vals.reduce((s,v) => s + v, 0);
+  const previewEl = document.getElementById('bag-total-preview');
+  if (vals.length) {
+    previewEl.style.display = 'block';
+    document.getElementById('bag-total-preview-val').textContent = fmtWeight(total);
+  } else {
+    previewEl.style.display = 'none';
+  }
+}
+
+document.getElementById('bag-photos').addEventListener('change', function(e) {
+  handlePhotoFiles(Array.from(e.target.files), pendingBagPhotos, 'bag-photo-previews');
+});
+
+function submitSaveBag() {
+  const wIds = ['bag-w1','bag-w2','bag-w3','bag-w4','bag-w5'];
+  const weights = wIds.map(id => parseFloat(document.getElementById(id).value)).filter(v => v > 0 && v <= 30);
+
+  if (!weights.length) {
+    const errEl = document.getElementById('bag-weight-err');
+    errEl.style.display = 'block';
+    document.getElementById('bag-w1').classList.add('invalid');
+    return;
+  }
+
+  document.getElementById('bag-weight-err').style.display = 'none';
+  document.getElementById('bag-w1').classList.remove('invalid');
+
+  const total = weights.reduce((s,v) => s + v, 0);
+  const entry = {
+    id:       uid(),
+    date:     document.getElementById('bag-save-date').value || todayISO(),
+    location: document.getElementById('bag-save-location').value.trim(),
+    weights:  weights.sort((a,b) => b - a),
+    total,
+    lures:    document.getElementById('bag-save-lures').value.trim(),
+    notes:    document.getElementById('bag-save-notes').value.trim(),
+    photos:   [...pendingBagPhotos],
+    savedAt:  Date.now(),
+  };
+
+  bigBags.unshift(entry);
+  persist();
+  closeModal('save-bag-modal');
+  renderBagHistory();
+  renderHeaderStats();
+  showToast(`Bag saved — ${fmtWeight(total)}`);
+}
+
+function renderBagHistory() {
+  const sort    = document.getElementById('bag-sort').value;
+  const locFilt = document.getElementById('bag-filter-loc').value.trim().toLowerCase();
+  let bags = [...bigBags];
+
+  if (locFilt) bags = bags.filter(b => (b.location||'').toLowerCase().includes(locFilt));
+
+  switch(sort) {
+    case 'newest':      bags.sort((a,b) => new Date(b.date) - new Date(a.date)); break;
+    case 'oldest':      bags.sort((a,b) => new Date(a.date) - new Date(b.date)); break;
+    case 'heaviest':    bags.sort((a,b) => b.total - a.total); break;
+    case 'biggest-fish':bags.sort((a,b) => Math.max(...b.weights) - Math.max(...a.weights)); break;
+    case 'location':    bags.sort((a,b) => (a.location||'').localeCompare(b.location||'')); break;
+  }
+
+  const el = document.getElementById('bag-list');
+  if (!bags.length) {
+    el.innerHTML = `<div class="empty-state">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"/></svg>
+      <h3>No bags saved yet</h3>
+      <p>Your best-5 bag is added automatically when you save a day. You can also tap "Save Bag" to log one manually.</p>
+    </div>`;
+    return;
+  }
+
+  el.innerHTML = bags.map(bag => {
+    const biggestW = Math.max(...bag.weights);
+    const hasPhoto = bag.photos && bag.photos.length;
+    return `
+      <div class="record-card" role="listitem" aria-label="${fmtWeight(bag.total)} bag on ${fmtDate(bag.date)}">
+        ${hasPhoto ? `<img class="record-card-photo" src="${bag.photos[0]}" alt="Bag photo" onclick="openLightbox('${bag.photos[0]}')" loading="lazy">` : ''}
+        <div class="record-card-body">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
+            <div>
+              <div class="record-card-weight">${fmtWeight(bag.total)}</div>
+              <div class="record-card-location">${escapHtml(bag.location || 'No location')}</div>
+              <div class="record-card-date">${fmtDate(bag.date)}${bag.lures ? ' &mdash; ' + escapHtml(bag.lures) : ''}</div>
+            </div>
+          </div>
+          <div class="bag-weights-row">
+            ${bag.weights.map(w => `<span class="bag-weight-pill${w === biggestW ? ' biggest' : ''}">${fmtWeight(w)}</span>`).join('')}
+          </div>
+          ${bag.notes ? `<p style="font-size:0.82rem;color:var(--c-text2);margin-top:8px;font-style:italic;">${escapHtml(bag.notes)}</p>` : ''}
+        </div>
+        <div class="record-card-footer">
+          <button class="btn btn-sm btn-danger" onclick="confirmDeleteBag('${bag.id}')" aria-label="Delete this bag record">Delete</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function confirmDeleteBag(id) {
+  showConfirm('Delete Bag Record?', 'This bag record will be permanently removed.', () => {
+    bigBags = bigBags.filter(b => b.id !== id);
+    persist();
+    renderBagHistory();
+    renderHeaderStats();
+    showToast('Bag record deleted');
+  });
+}
+
+/* ========================================================
+   PHOTO HANDLING
+   ======================================================== */
+
+function handlePhotoFiles(files, store, previewContainerId) {
+  files.forEach(file => {
+    if (!file.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      // Compress before storing
+      compressImage(e.target.result, 1200, 0.75, dataUrl => {
+        store.push(dataUrl);
+        renderPhotoThumbs(store, previewContainerId);
+      });
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function compressImage(dataUrl, maxSize, quality, callback) {
+  const img = new Image();
+  img.onload = () => {
+    let { width, height } = img;
+    if (width > maxSize || height > maxSize) {
+      const ratio = Math.min(maxSize / width, maxSize / height);
+      width  = Math.round(width  * ratio);
+      height = Math.round(height * ratio);
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width  = width;
+    canvas.height = height;
+    canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+    callback(canvas.toDataURL('image/jpeg', quality));
+  };
+  img.src = dataUrl;
+}
+
+function renderPhotoThumbs(store, containerId) {
+  const el = document.getElementById(containerId);
+  el.innerHTML = store.map((src, i) => `
+    <div class="photo-thumb">
+      <img src="${src}" alt="Photo ${i+1}">
+      <button class="photo-thumb-remove" onclick="removePhoto(${i},'${containerId}')" aria-label="Remove photo ${i+1}">&times;</button>
+    </div>`).join('');
+}
+
+function removePhoto(index, containerId) {
+  // Find which store this container belongs to
+  const storeMap = {
+    'fish-photo-previews': pendingFishPhotos,
+    'day-photo-previews':  pendingDayPhotos,
+    'bf-photo-previews':   pendingBfPhotos,
+    'bag-photo-previews':  pendingBagPhotos,
+  };
+  const store = storeMap[containerId];
+  if (store) {
+    store.splice(index, 1);
+    renderPhotoThumbs(store, containerId);
+  }
+}
+
+/* ========================================================
+   MODAL / DIALOG HELPERS
+   ======================================================== */
+
+function openModal(id) {
+  const el = document.getElementById(id);
+  el.classList.add('open');
+  document.body.style.overflow = 'hidden';
+  // Trap focus inside modal
+  const firstFocusable = el.querySelector('button,input,textarea,select');
+  if (firstFocusable) setTimeout(() => firstFocusable.focus(), 100);
+}
+
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+function handleOverlayClick(e, id) {
+  if (e.target.id === id) closeModal(id);
+}
+
+// Close modal on Escape
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    document.querySelectorAll('.modal-overlay.open').forEach(m => closeModal(m.id));
+    if (document.getElementById('confirm-overlay').classList.contains('open')) closeConfirm();
+    if (document.getElementById('lightbox').classList.contains('open')) closeLightbox();
+  }
+});
+
+let confirmCallback = null;
+
+function showConfirm(title, message, callback) {
+  document.getElementById('confirm-title').textContent = title;
+  document.getElementById('confirm-message').textContent = message;
+  confirmCallback = callback;
+  document.getElementById('confirm-overlay').classList.add('open');
+  setTimeout(() => document.getElementById('confirm-ok-btn').focus(), 100);
+}
+
+function confirmAction() {
+  const cb = confirmCallback; /* save before closeConfirm nulls it */
+  closeConfirm();
+  if (cb) cb();
+}
+
+function closeConfirm() {
+  document.getElementById('confirm-overlay').classList.remove('open');
+  confirmCallback = null;
+}
+
+/* ========================================================
+   FIELD VALIDATION HELPERS
+   ======================================================== */
+
+function showFieldError(inputId, errId) {
+  document.getElementById(inputId).classList.add('invalid');
+  document.getElementById(errId).classList.add('visible');
+  document.getElementById(inputId).focus();
+}
+
+function clearFieldError(inputId, errId) {
+  document.getElementById(inputId).classList.remove('invalid');
+  document.getElementById(errId).classList.remove('visible');
+}
+
+/* ========================================================
+   TOAST
+   ======================================================== */
+
+let toastTimer = null;
+
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2600);
+}
+
+/* ========================================================
+   LIGHTBOX
+   ======================================================== */
+
+function openLightbox(src) {
+  document.getElementById('lightbox-img').src = src;
+  document.getElementById('lightbox').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeLightbox() {
+  document.getElementById('lightbox').classList.remove('open');
+  document.getElementById('lightbox-img').src = '';
+  document.body.style.overflow = '';
+}
+
+document.getElementById('lightbox').addEventListener('click', e => {
+  if (e.target === document.getElementById('lightbox')) closeLightbox();
+});
+
+/* ========================================================
+   SETTINGS SCREEN
+   ======================================================== */
+
+function renderSettingsScreen() {
+  const cfg = getGHConfig();
+  const statusEl = document.getElementById('gh-status-row');
+  if (!statusEl) return;
+  if (cfg.token && cfg.repo) {
+    const last = cfg.lastBackup ? `Last backup: ${cfg.lastBackup.slice(0,10)}` : 'Never backed up yet';
+    statusEl.style.color = 'var(--c-accent)';
+    statusEl.textContent = `✓ Connected — ${cfg.repo} · ${last}`;
+  } else {
+    statusEl.style.color = 'var(--c-text3)';
+    statusEl.textContent = 'Not configured';
+  }
+  /* Pre-fill saved values into the inline inputs */
+  const tokenEl = document.getElementById('gh-token');
+  const repoEl  = document.getElementById('gh-repo');
+  if (tokenEl && cfg.token) tokenEl.value = cfg.token;
+  if (repoEl  && cfg.repo)  repoEl.value  = cfg.repo;
+}
+
+async function saveGHSettingsInline() {
+  const token = (document.getElementById('gh-token').value || '').trim();
+  const repo  = (document.getElementById('gh-repo').value  || '').trim();
+  if (!token || !repo)          { showToast('Enter both token and repo name'); return; }
+  if (!repo.includes('/'))      { showToast('Repo must be username/repo-name'); return; }
+  saveGHConfig({ token, repo });
+  showToast('Testing connection…');
+  const ok = await githubBackup(false);
+  if (ok) {
+    renderSettingsScreen(); /* refresh status row */
+    showToast('✓ GitHub backup configured & working!');
+  }
+}
+
+/* ========================================================
+   EXPORT / IMPORT + GITHUB AUTO-BACKUP
+   ======================================================== */
+
+/* ── GitHub backup config stored separately so it survives data clears ── */
+const GH_KEY = 'bt_github_config';
+
+function getGHConfig() {
+  try { return JSON.parse(localStorage.getItem(GH_KEY)) || {}; } catch(e) { return {}; }
+}
+
+function saveGHConfig(cfg) {
+  localStorage.setItem(GH_KEY, JSON.stringify(cfg));
+}
+
+/* ── Core backup payload ── */
+function buildBackupPayload() {
+  return {
+    exportedAt: new Date().toISOString(),
+    version: 2,
+    currentDay,
+    savedDays,
+    bigFish,
+    bigBags,
+  };
+}
+
+/* ── Local export (unchanged) ── */
+function exportData() {
+  const blob = new Blob([JSON.stringify(buildBackupPayload(), null, 2)], {type: 'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `bass-tracker-backup-${todayISO()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('Backup exported');
+}
+
+/* ── Local import (unchanged) ── */
+function importData() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json,application/json';
+  input.onchange = e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        showConfirm(
+          'Import Backup?',
+          'This will replace all current data with the backup file. This cannot be undone.',
+          () => {
+            if (data.currentDay) currentDay = data.currentDay;
+            if (data.savedDays)  savedDays  = data.savedDays;
+            if (data.bigFish)    bigFish    = data.bigFish;
+            if (data.bigBags)    bigBags    = data.bigBags;
+            persist();
+            renderToday();
+            renderHeaderStats();
+            showToast('Backup restored');
+          }
+        );
+      } catch(err) {
+        showToast('Invalid backup file');
+      }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+
+/* ── GitHub API helpers ── */
+async function ghRequest(method, path, body, token) {
+  const res = await fetch(`https://api.github.com${path}`, {
+    method,
+    headers: {
+      'Authorization': `token ${token}`,
+      'Accept': 'application/vnd.github.v3+json',
+      'Content-Type': 'application/json',
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  return { ok: res.ok, status: res.status, data: await res.json() };
+}
+
+/* ── Push backup to GitHub ── */
+async function githubBackup(silent = false) {
+  const cfg = getGHConfig();
+  if (!cfg.token || !cfg.repo) {
+    if (!silent) showToast('Set up GitHub backup in Settings first');
+    return false;
+  }
+
+  if (!silent) showToast('Backing up to GitHub…');
+
+  try {
+    const content = btoa(unescape(encodeURIComponent(JSON.stringify(buildBackupPayload(), null, 2))));
+    const filePath = `/repos/${cfg.repo}/contents/bass-tracker-backup.json`;
+
+    /* Check if file already exists to get its SHA (needed for updates) */
+    const existing = await ghRequest('GET', filePath, null, cfg.token);
+    const sha = existing.ok ? existing.data.sha : undefined;
+
+    const result = await ghRequest('PUT', filePath, {
+      message: `Bass Tracker auto-backup ${new Date().toISOString().slice(0,10)}`,
+      content,
+      ...(sha ? { sha } : {}),
+    }, cfg.token);
+
+    if (result.ok) {
+      const ts = new Date().toISOString();
+      saveGHConfig({ ...cfg, lastBackup: ts });
+      if (!silent) showToast('✓ Backed up to GitHub');
+      return true;
+    } else {
+      if (!silent) showToast('GitHub backup failed — check your token & repo');
+      return false;
+    }
+  } catch(err) {
+    if (!silent) showToast('GitHub backup failed — check internet connection');
+    return false;
+  }
+}
+
+/* ── Restore from GitHub ── */
+async function githubRestore() {
+  const cfg = getGHConfig();
+  if (!cfg.token || !cfg.repo) {
+    showToast('Set up GitHub backup in Settings first');
+    return;
+  }
+
+  showToast('Fetching from GitHub…');
+
+  try {
+    const filePath = `/repos/${cfg.repo}/contents/bass-tracker-backup.json`;
+    const result = await ghRequest('GET', filePath, null, cfg.token);
+
+    if (!result.ok) {
+      showToast('No backup found on GitHub yet');
+      return;
+    }
+
+    const decoded = decodeURIComponent(escape(atob(result.data.content.replace(/\n/g, ''))));
+    const data = JSON.parse(decoded);
+
+    showConfirm(
+      'Restore from GitHub?',
+      `Backup from ${data.exportedAt ? data.exportedAt.slice(0,10) : 'unknown date'}. This will replace all current data.`,
+      () => {
+        if (data.currentDay) currentDay = data.currentDay;
+        if (data.savedDays)  savedDays  = data.savedDays;
+        if (data.bigFish)    bigFish    = data.bigFish;
+        if (data.bigBags)    bigBags    = data.bigBags;
+        persist();
+        renderToday();
+        renderHeaderStats();
+        showToast('✓ Restored from GitHub');
+      }
+    );
+  } catch(err) {
+    showToast('Restore failed — check your connection');
+  }
+}
+
+/* ── Check on launch: if localStorage empty but GitHub configured, offer restore ── */
+async function checkRestoreOnLaunch() {
+  const cfg = getGHConfig();
+  if (!cfg.token || !cfg.repo) return;
+  if (savedDays.length > 0 || bigFish.length > 0 || bigBags.length > 0) return;
+
+  /* Data looks empty — offer restore */
+  showConfirm(
+    'Restore from GitHub?',
+    'Your local data appears empty but you have a GitHub backup configured. Restore it now?',
+    githubRestore
+  );
+}
+
+/* ── GitHub settings modal ── */
+function openGHSettings() {
+  closeDataMenu();
+  const cfg = getGHConfig();
+
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:600;display:flex;align-items:flex-end;justify-content:center;';
+
+  overlay.innerHTML = `
+    <div style="background:var(--c-bg2);border-radius:16px 16px 0 0;border:1px solid var(--c-border);width:100%;max-width:430px;padding:20px 16px 40px;">
+      <div style="width:36px;height:4px;background:var(--c-border2);border-radius:2px;margin:0 auto 18px;"></div>
+      <h2 style="font-size:1.1rem;font-weight:700;color:var(--c-text);margin-bottom:6px;">GitHub Auto-Backup</h2>
+      <p style="font-size:0.82rem;color:var(--c-text2);margin-bottom:18px;line-height:1.5;">Your data backs up automatically to a private GitHub repo every time you save a day. One-time setup.</p>
+
+      <div style="margin-bottom:14px;">
+        <label style="display:block;font-size:0.8rem;font-weight:600;color:var(--c-text2);margin-bottom:6px;">GitHub Personal Access Token</label>
+        <input id="gh-token-input" type="password" placeholder="ghp_xxxxxxxxxxxx"
+          style="width:100%;background:var(--c-bg3);border:1px solid var(--c-border);border-radius:var(--r);padding:12px 14px;font-size:0.95rem;color:var(--c-text);font-family:var(--font-mono);"
+          value="${cfg.token || ''}">
+      </div>
+
+      <div style="margin-bottom:18px;">
+        <label style="display:block;font-size:0.8rem;font-weight:600;color:var(--c-text2);margin-bottom:6px;">Repository (username/repo-name)</label>
+        <input id="gh-repo-input" type="text" placeholder="yourname/bass-tracker-data"
+          style="width:100%;background:var(--c-bg3);border:1px solid var(--c-border);border-radius:var(--r);padding:12px 14px;font-size:0.95rem;color:var(--c-text);"
+          value="${cfg.repo || ''}">
+      </div>
+
+      ${cfg.lastBackup ? `<p style="font-size:0.78rem;color:var(--c-accent);margin-bottom:14px;">✓ Last backup: ${cfg.lastBackup.slice(0,10)}</p>` : ''}
+
+      <button onclick="saveGHSettings()" style="width:100%;padding:14px;background:var(--c-accent);border:none;border-radius:var(--r);font-size:1rem;font-weight:700;color:#fff;cursor:pointer;margin-bottom:10px;">Save & Test Connection</button>
+      <button onclick="githubRestore();document.getElementById('gh-overlay').remove();" style="width:100%;padding:13px;background:transparent;border:1px solid var(--c-border2);border-radius:var(--r);font-size:0.95rem;font-weight:500;color:var(--c-text2);cursor:pointer;margin-bottom:10px;">Restore from GitHub</button>
+      <button onclick="document.getElementById('gh-overlay').remove();" style="width:100%;padding:13px;background:transparent;border:none;font-size:0.9rem;color:var(--c-text3);cursor:pointer;">Cancel</button>
+    </div>
+  `;
+
+  overlay.id = 'gh-overlay';
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+}
+
+async function saveGHSettings() {
+  const token = document.getElementById('gh-token-input').value.trim();
+  const repo  = document.getElementById('gh-repo-input').value.trim();
+
+  if (!token || !repo) { showToast('Enter both token and repo'); return; }
+  if (!repo.includes('/')) { showToast('Repo must be username/repo-name'); return; }
+
+  saveGHConfig({ token, repo });
+
+  document.getElementById('gh-overlay').remove();
+  showToast('Testing connection…');
+
+  /* Test by doing a real backup */
+  const ok = await githubBackup(false);
+  if (ok) showToast('✓ GitHub backup configured & working!');
+}
+
+// Long-press header for data menu
+let headerPressTimer = null;
+const appHeader = document.getElementById('app-header');
+appHeader.addEventListener('touchstart', () => {
+  headerPressTimer = setTimeout(showDataMenu, 800);
+});
+appHeader.addEventListener('touchend', () => clearTimeout(headerPressTimer));
+appHeader.addEventListener('dblclick', showDataMenu);
+
+let dataMenuOpen = false;
+
+function showDataMenu() {
+  if (dataMenuOpen) return;
+  dataMenuOpen = true;
+  const cfg = getGHConfig();
+  const ghStatus = cfg.token ? `✓ GitHub connected` : 'Set up GitHub Backup';
+
+  const menu = document.createElement('div');
+  menu.style.cssText = `position:fixed;top:${document.getElementById('app-header').offsetHeight+4}px;right:12px;background:var(--c-surface);border:1px solid var(--c-border2);border-radius:var(--r-lg);padding:8px;z-index:500;min-width:200px;box-shadow:0 8px 24px rgba(0,0,0,0.4);`;
+  menu.innerHTML = `
+    <button onclick="githubBackup(false);closeDataMenu()" style="display:block;width:100%;text-align:left;padding:12px 14px;background:none;border:none;color:${cfg.token ? 'var(--c-accent)' : 'var(--c-text)'};font-size:0.9rem;font-weight:600;cursor:pointer;border-radius:8px;">☁ Backup to GitHub</button>
+    <button onclick="openGHSettings()" style="display:block;width:100%;text-align:left;padding:12px 14px;background:none;border:none;color:var(--c-text2);font-size:0.82rem;cursor:pointer;border-radius:8px;">${ghStatus}</button>
+    <div style="height:1px;background:var(--c-border);margin:4px 0;"></div>
+    <button onclick="exportData();closeDataMenu()" style="display:block;width:100%;text-align:left;padding:12px 14px;background:none;border:none;color:var(--c-text);font-size:0.9rem;font-weight:600;cursor:pointer;border-radius:8px;">Export Local Backup</button>
+    <button onclick="importData();closeDataMenu()" style="display:block;width:100%;text-align:left;padding:12px 14px;background:none;border:none;color:var(--c-text);font-size:0.9rem;font-weight:600;cursor:pointer;border-radius:8px;">Import Local Backup</button>
+    <div style="height:1px;background:var(--c-border);margin:4px 0;"></div>
+    <button onclick="closeDataMenu()" style="display:block;width:100%;text-align:left;padding:12px 14px;background:none;border:none;color:var(--c-text3);font-size:0.88rem;cursor:pointer;border-radius:8px;">Cancel</button>
+  `;
+  document.body.appendChild(menu);
+
+  setTimeout(() => {
+    document.addEventListener('click', function handler(e) {
+      if (!menu.contains(e.target)) { closeDataMenu(); document.removeEventListener('click', handler); }
+    });
+  }, 50);
+
+  window._dataMenu = menu;
+}
+
+function closeDataMenu() {
+  if (window._dataMenu) { window._dataMenu.remove(); window._dataMenu = null; }
+  dataMenuOpen = false;
+}
+
+/* ========================================================
+   INIT
+   ======================================================== */
+
+renderToday();
+renderHeaderStats();
+checkRestoreOnLaunch();
+
+</script>
+</body>
+</html>
