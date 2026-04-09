@@ -2150,6 +2150,9 @@ function openAddFishModal(editId) {
     }
   } else {
     titleEl.textContent = 'Add Fish Catch';
+    if (currentDay.location) {
+      document.getElementById('fish-location').value = currentDay.location;
+    }
   }
 
   openModal('add-fish-modal');
