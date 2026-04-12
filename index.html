@@ -1399,9 +1399,6 @@ select {
         <option value="lightest">Lightest</option>
         <option value="location">By Location</option>
       </select>
-      <select id="fish-filter-species" aria-label="Filter by species" onchange="renderBigFish()" style="min-width:130px;min-height:40px;font-size:0.82rem;padding:8px 10px;">
-        <option value="">All Species</option>
-      </select>
       <button class="filter-chip" id="fish-filter-pb" onclick="toggleFilter('fish-pb')" aria-pressed="false" aria-label="Show only personal bests">PB Only</button>
       <button class="filter-chip" id="fish-filter-notable" onclick="toggleFilter('fish-notable')" aria-pressed="false" aria-label="Show only notable fish">Notable</button>
       <button class="filter-chip" id="fish-filter-6lb" onclick="toggleFilter('fish-6lb')" aria-pressed="false" aria-label="Show only fish 6 lbs or heavier">6+ lb</button>
@@ -1529,12 +1526,6 @@ select {
       <form id="add-fish-form" novalidate onsubmit="return false;">
         <input type="hidden" id="fish-edit-id">
 
-        <div class="form-group">
-          <label for="fish-species">Species <span class="required-mark" aria-hidden="true">*</span></label>
-          <input type="text" id="fish-species" name="species" placeholder="e.g. Largemouth Bass" autocomplete="off" list="species-suggestions" required aria-required="true">
-          <div class="field-error" id="fish-species-err" role="alert">Species is required</div>
-        </div>
-
         <div class="input-row">
           <div class="form-group">
             <label for="fish-weight">Weight (lb) <span class="required-mark" aria-hidden="true">*</span></label>
@@ -1652,12 +1643,6 @@ select {
     <div class="modal-body">
       <form id="big-fish-form" novalidate onsubmit="return false;">
         <input type="hidden" id="bf-edit-id">
-
-        <div class="form-group">
-          <label for="bf-species">Species <span class="required-mark" aria-hidden="true">*</span></label>
-          <input type="text" id="bf-species" placeholder="e.g. Largemouth Bass" autocomplete="off" list="species-suggestions" required>
-          <div class="field-error" id="bf-species-err" role="alert">Species is required</div>
-        </div>
 
         <div class="input-row">
           <div class="form-group">
@@ -1814,7 +1799,6 @@ select {
 <!-- Autocomplete suggestion lists -->
 <datalist id="location-suggestions"></datalist>
 <datalist id="lure-suggestions"></datalist>
-<datalist id="species-suggestions"></datalist>
 
 <!-- ============================================================
      JAVASCRIPT
@@ -1866,49 +1850,6 @@ function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2);
 }
 
-/* ========================================================
-   SPECIES CONFIG
-   ======================================================== */
-
-const SPECIES_LIST = [
-  'Largemouth Bass','Smallmouth Bass','Spotted Bass','Striped Bass',
-  'Walleye','Sauger',
-  'Northern Pike','Muskie','Tiger Muskie',
-  'King Salmon','Coho Salmon','Atlantic Salmon',
-  'Rainbow Trout','Brown Trout','Brook Trout','Lake Trout',
-  'Bluegill','Crappie','Yellow Perch',
-  'Channel Catfish','Flathead Catfish','Carp',
-];
-
-const SPECIES_THRESHOLDS = {
-  'Largemouth Bass': 5.5,
-  'Smallmouth Bass': 4.0,
-  'Spotted Bass':    3.5,
-  'Striped Bass':   15.0,
-  'Walleye':         8.0,
-  'Sauger':          3.0,
-  'Northern Pike':  15.0,
-  'Muskie':         25.0,
-  'Tiger Muskie':   20.0,
-  'King Salmon':    20.0,
-  'Coho Salmon':    10.0,
-  'Atlantic Salmon':15.0,
-  'Rainbow Trout':   5.0,
-  'Brown Trout':     5.0,
-  'Brook Trout':     3.0,
-  'Lake Trout':     10.0,
-  'Bluegill':        1.0,
-  'Crappie':         2.0,
-  'Yellow Perch':    1.5,
-  'Channel Catfish':20.0,
-  'Flathead Catfish':20.0,
-  'Carp':           20.0,
-};
-
-function getQualifyingThreshold(species) {
-  return SPECIES_THRESHOLDS[species] ?? 5.5;
-}
-
 /* Load initial state */
 let currentDay = loadData(STORAGE_KEYS.currentDay) || newCurrentDay();
 let savedDays  = loadData(STORAGE_KEYS.savedDays)  || [];
@@ -1919,7 +1860,6 @@ function newCurrentDay() {
   return {
     date: todayISO(),
     location: '',
-    species: '',
     conditions: '',
     notes: '',
     photos: [],
@@ -1973,13 +1913,6 @@ function buildSuggestions() {
 
   fillList('location-suggestions', locations);
   fillList('lure-suggestions',     lures);
-
-  // Species datalist: preset list + any custom species already entered
-  const usedSpecies = new Set(SPECIES_LIST);
-  currentDay.fish.forEach(f => { if (f.species) usedSpecies.add(f.species); });
-  savedDays.forEach(d => (d.fish||[]).forEach(f => { if (f.species) usedSpecies.add(f.species); }));
-  bigFish.forEach(f => { if (f.species) usedSpecies.add(f.species); });
-  fillList('species-suggestions', usedSpecies);
 }
 
 /* ========================================================
@@ -2129,11 +2062,10 @@ function renderTodayFishList() {
     const inBag = best5Ids.has(fish.id);
     const details = [fish.length ? `${fish.length}"` : '', fish.lure, fish.location].filter(Boolean).join(' · ');
     return `
-      <div class="fish-card${inBag ? ' in-bag' : ''}" role="listitem" aria-label="${fmtWeight(fish.weight)} ${escapHtml(fish.species || 'fish')}${inBag ? ', in best 5 bag' : ''}">
+      <div class="fish-card${inBag ? ' in-bag' : ''}" role="listitem" aria-label="${fmtWeight(fish.weight)} bass${inBag ? ', in best 5 bag' : ''}">
         <div class="fish-card-header">
           <div>
             <div class="fish-card-weight">${fmtWeight(fish.weight)}</div>
-            ${fish.species ? `<div style="font-size:0.75rem;color:var(--c-text3);margin-top:1px;">${escapHtml(fish.species)}</div>` : ''}
           </div>
           <div class="fish-card-meta">
             <div class="fish-card-meta-row">${escapHtml(details)}</div>
@@ -2201,7 +2133,6 @@ function openAddFishModal(editId) {
   document.getElementById('fish-edit-id').value = editId || '';
   document.getElementById('fish-photo-previews').innerHTML = '';
   document.getElementById('fish-bag-hint').textContent = '';
-  clearFieldError('fish-species', 'fish-species-err');
   clearFieldError('fish-weight', 'fish-weight-err');
 
   const titleEl = document.getElementById('add-fish-modal-title');
@@ -2209,7 +2140,6 @@ function openAddFishModal(editId) {
     const fish = currentDay.fish.find(f => f.id === editId);
     if (fish) {
       titleEl.textContent = 'Edit Fish Catch';
-      document.getElementById('fish-species').value  = fish.species || '';
       document.getElementById('fish-weight').value   = fish.weight;
       document.getElementById('fish-length').value   = fish.length || '';
       document.getElementById('fish-location').value = fish.location || '';
@@ -2222,8 +2152,9 @@ function openAddFishModal(editId) {
     }
   } else {
     titleEl.textContent = 'Add Fish Catch';
-    if (currentDay.location) document.getElementById('fish-location').value = currentDay.location;
-    if (currentDay.species) document.getElementById('fish-species').value = currentDay.species;
+    if (currentDay.location) {
+      document.getElementById('fish-location').value = currentDay.location;
+    }
   }
 
   openModal('add-fish-modal');
@@ -2254,13 +2185,6 @@ document.getElementById('fish-photos').addEventListener('change', function(e) {
 });
 
 function submitAddFish() {
-  const speciesVal = document.getElementById('fish-species').value.trim();
-  if (!speciesVal) {
-    showFieldError('fish-species', 'fish-species-err');
-    return;
-  }
-  clearFieldError('fish-species', 'fish-species-err');
-
   const weightVal = parseFloat(document.getElementById('fish-weight').value);
   if (!weightVal || weightVal <= 0 || weightVal > 30) {
     showFieldError('fish-weight', 'fish-weight-err');
@@ -2272,7 +2196,6 @@ function submitAddFish() {
 
   const entry = {
     id:        editId || uid(),
-    species:   speciesVal,
     weight:    weightVal,
     length:    parseFloat(document.getElementById('fish-length').value) || null,
     location:  document.getElementById('fish-location').value.trim() || currentDay.location,
@@ -2289,8 +2212,11 @@ function submitAddFish() {
     const idx = currentDay.fish.findIndex(f => f.id === editId);
     if (idx > -1) currentDay.fish[idx] = entry;
   } else {
-    if (!currentDay.location && entry.location) currentDay.location = entry.location;
-    if (!currentDay.species) currentDay.species = speciesVal;
+    // If no session location set, inherit
+    if (!currentDay.location && entry.location) {
+      currentDay.location = entry.location;
+    }
+    // Auto-set date if not set
     if (!currentDay.date) currentDay.date = todayISO();
     currentDay.fish.push(entry);
   }
@@ -2383,19 +2309,18 @@ function submitSaveDay() {
     }
   }
 
-  /* ── AUTO-PUSH QUALIFYING FISH (per-species threshold) ─────
-     Each species has its own notable-weight threshold.
+  /* ── AUTO-PUSH QUALIFYING FISH (≥ 5.5 lb) ──────────────
+     Only fish 5.5 lbs or heavier are logged automatically.
      Stable ID: savedDay.id + '_fish_' + originalFishId.
-     Skips any fish already present in bigFish.               */
+     Skips any fish already present in bigFish.             */
+  const QUALIFYING_THRESHOLD = 5.5;
   currentDay.fish.forEach(fish => {
-    const threshold = getQualifyingThreshold(fish.species);
-    if (fish.weight < threshold) return;
+    if (fish.weight < QUALIFYING_THRESHOLD) return;
     const autoFishId = savedDay.id + '_fish_' + fish.id;
     const alreadyLogged = bigFish.some(f => f.id === autoFishId);
     if (!alreadyLogged) {
       bigFish.unshift({
         id:        autoFishId,
-        species:   fish.species || '',
         weight:    fish.weight,
         length:    fish.length || null,
         date:      savedDay.date,
@@ -2404,7 +2329,7 @@ function submitSaveDay() {
         notes:     fish.notes || '',
         photos:    fish.photos ? [...fish.photos] : [],
         isPB:      fish.isPB || false,
-        isNotable: true,
+        isNotable: true, // 5.5+ lb qualifies as notable
         autoAdded: true,
       });
     }
@@ -2414,7 +2339,7 @@ function submitSaveDay() {
   closeModal('save-day-modal');
 
   /* Build informative toast: count what was actually auto-added */
-  const qualifyingCount = currentDay.fish.filter(f => f.weight >= getQualifyingThreshold(f.species)).length;
+  const qualifyingCount = currentDay.fish.filter(f => f.weight >= QUALIFYING_THRESHOLD).length;
   let toastMsg = 'Day saved!';
   if (best5.length > 0 && qualifyingCount > 0) {
     toastMsg = `Day saved · bag logged · ${qualifyingCount} fish auto-added`;
@@ -2615,12 +2540,10 @@ function openBigFishModal(editId) {
   document.getElementById('bf-photo-previews').innerHTML = '';
   document.getElementById('big-fish-modal-title').textContent = editId ? 'Edit Fish Entry' : 'Log Big Fish';
   clearFieldError('bf-weight','bf-weight-err');
-  clearFieldError('bf-species','bf-species-err');
 
   if (editId) {
     const fish = bigFish.find(f => f.id === editId);
     if (fish) {
-      document.getElementById('bf-species').value = fish.species || '';
       document.getElementById('bf-weight').value   = fish.weight;
       document.getElementById('bf-length').value   = fish.length || '';
       document.getElementById('bf-date').value     = fish.date;
@@ -2634,7 +2557,6 @@ function openBigFishModal(editId) {
     }
   } else {
     document.getElementById('bf-date').value = todayISO();
-    if (currentDay.species) document.getElementById('bf-species').value = currentDay.species;
   }
 
   openModal('big-fish-modal');
@@ -2645,10 +2567,6 @@ document.getElementById('bf-photos').addEventListener('change', function(e) {
 });
 
 function submitBigFish() {
-  const speciesVal = document.getElementById('bf-species').value.trim();
-  if (!speciesVal) { showFieldError('bf-species','bf-species-err'); return; }
-  clearFieldError('bf-species','bf-species-err');
-
   const weightVal = parseFloat(document.getElementById('bf-weight').value);
   if (!weightVal || weightVal <= 0 || weightVal > 30) {
     showFieldError('bf-weight','bf-weight-err'); return;
@@ -2658,7 +2576,6 @@ function submitBigFish() {
   const editId = document.getElementById('bf-edit-id').value;
   const entry = {
     id:        editId || uid(),
-    species:   speciesVal,
     weight:    weightVal,
     length:    parseFloat(document.getElementById('bf-length').value) || null,
     date:      document.getElementById('bf-date').value || todayISO(),
@@ -2718,24 +2635,15 @@ function toggleFilter(key) {
 }
 
 function renderBigFish() {
-  const sort       = document.getElementById('fish-sort').value;
-  const locFilt    = document.getElementById('fish-filter-loc').value.trim().toLowerCase();
-  const specFilt   = document.getElementById('fish-filter-species').value;
+  const sort    = document.getElementById('fish-sort').value;
+  const locFilt = document.getElementById('fish-filter-loc').value.trim().toLowerCase();
   let fish = [...bigFish];
 
   if (fishFilters.pb)      fish = fish.filter(f => f.isPB);
   if (fishFilters.notable) fish = fish.filter(f => f.isNotable);
-  if (fishFilters.w7)      fish = fish.filter(f => f.weight >= 7);
-  else if (fishFilters.w6) fish = fish.filter(f => f.weight >= 6);
+  if (fishFilters.w7)      fish = fish.filter(f => f.weight >= 7);   /* NEW: 7+ lb */
+  else if (fishFilters.w6) fish = fish.filter(f => f.weight >= 6);   /* NEW: 6+ lb */
   if (locFilt)             fish = fish.filter(f => (f.location||'').toLowerCase().includes(locFilt));
-  if (specFilt)            fish = fish.filter(f => (f.species||'') === specFilt);
-
-  // Populate species dropdown from current data
-  const speciesInLog = [...new Set(bigFish.map(f => f.species).filter(Boolean))].sort();
-  const specSelect = document.getElementById('fish-filter-species');
-  const currentVal = specSelect.value;
-  specSelect.innerHTML = '<option value="">All Species</option>' +
-    speciesInLog.map(s => `<option value="${escapHtml(s)}"${s === currentVal ? ' selected' : ''}>${escapHtml(s)}</option>`).join('');
 
   switch(sort) {
     case 'newest':   fish.sort((a,b) => new Date(b.date) - new Date(a.date)); break;
@@ -2750,22 +2658,20 @@ function renderBigFish() {
     el.innerHTML = `<div class="empty-state">
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></svg>
       <h3>No fish entries</h3>
-      <p>Notable catches are added automatically when you save a day. You can also tap "Add Entry" to log one manually.</p>
+      <p>Bass 5.5 lb+ are added automatically when you save a day. You can also tap "Add Entry" to log a catch manually.</p>
     </div>`;
     return;
   }
 
   el.innerHTML = fish.map(f => {
     const hasPhoto = f.photos && f.photos.length;
-    const speciesLabel = f.species ? escapHtml(f.species) : '';
     return `
-      <div class="record-card" role="listitem" aria-label="${fmtWeight(f.weight)} ${speciesLabel} on ${fmtDate(f.date)}">
-        ${hasPhoto ? `<img class="record-card-photo" src="${f.photos[0]}" alt="Photo of ${fmtWeight(f.weight)} ${speciesLabel}" onclick="openLightbox('${f.photos[0]}')" loading="lazy">` : ''}
+      <div class="record-card" role="listitem" aria-label="${fmtWeight(f.weight)} bass on ${fmtDate(f.date)}">
+        ${hasPhoto ? `<img class="record-card-photo" src="${f.photos[0]}" alt="Photo of ${fmtWeight(f.weight)} bass" onclick="openLightbox('${f.photos[0]}')" loading="lazy">` : ''}
         <div class="record-card-body">
           <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
             <div>
               <div class="record-card-weight">${fmtWeight(f.weight)}${f.length ? ` &middot; ${f.length}"` : ''}</div>
-              ${speciesLabel ? `<div style="font-size:0.8rem;font-weight:600;color:var(--c-text2);margin-top:1px;">${speciesLabel}</div>` : ''}
               <div class="record-card-location">${escapHtml(f.location || 'No location')}</div>
               <div class="record-card-date">${fmtDate(f.date)}${f.lure ? ' &mdash; ' + escapHtml(f.lure) : ''}</div>
             </div>
