@@ -764,6 +764,8 @@ input.invalid, textarea.invalid, select.invalid {
   overflow: hidden;
 }
 
+.bag-record-card { cursor: pointer; }
+
 .record-card-photo {
   width: 100%;
   height: 140px;
@@ -1430,6 +1432,14 @@ select {
     <div id="bag-list" role="list" aria-label="Saved bag records">
       <!-- Filled by JS -->
     </div>
+
+    <div id="bag-detail-view" style="display:none;">
+      <button class="detail-back-btn" onclick="closeBagDetail()" aria-label="Back to bag history">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+        Bag History
+      </button>
+      <div id="bag-detail-content"></div>
+    </div>
   </section>
 
   <!-- ── SETTINGS SCREEN ──────────────────────────────── -->
@@ -1819,9 +1829,9 @@ const STORAGE_KEYS = {
 }
 
 FishEntry: { id, weight, length, location, lure, notes, photos[], timestamp, isPB }
-SavedDay: { id, date, location, conditions, notes, photos[], fish[], best5[], bagWeight, biggestFish, savedAt }
+SavedDay: { id, date, location, conditions, notes, photos[], fish[], best5[], bagWeight, biggestFish, savedAt, sourceBagId? }
 BigFish: { id, weight, length, date, location, lure, notes, photos[], isPB, isNotable }
-BigBag:  { id, date, location, weights[], total, lures, notes, photos[], savedAt }
+BigBag:  { id, date, location, weights[], total, lures, notes, photos[], savedAt, fish[]?, sourceTripId? }
 */
 
 function loadData(key) {
@@ -1861,7 +1871,15 @@ function newCurrentDay() {
 }
 
 function todayISO() {
-  return new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  const offsetMs = now.getTimezoneOffset() * 60000;
+  return new Date(now.getTime() - offsetMs).toISOString().slice(0, 10);
+}
+
+function dateSortValue(iso) {
+  if (!iso) return 0;
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y, (m || 1) - 1, d || 1).getTime();
 }
 
 function persist() {
@@ -1917,6 +1935,18 @@ function escapHtml(str) {
     .replace(/</g,'&lt;')
     .replace(/>/g,'&gt;')
     .replace(/"/g,'&quot;');
+}
+
+function getFishPhotos(fish) {
+  if (fish.photos && fish.photos.length) return fish.photos;
+  const sourceBag = fish.sourceBagId && bigBags.find(bag => bag.id === fish.sourceBagId);
+  return sourceBag && Array.isArray(sourceBag.photos) ? sourceBag.photos : [];
+}
+
+function getDayPhotos(day) {
+  if (day.photos && day.photos.length) return day.photos;
+  const sourceBag = day.sourceBagId && bigBags.find(bag => bag.id === day.sourceBagId);
+  return sourceBag && Array.isArray(sourceBag.photos) ? sourceBag.photos : [];
 }
 
 /* ========================================================
@@ -2222,11 +2252,13 @@ function submitSaveDay() {
         location: savedDay.location,
         weights:  best5.map(f => f.weight).sort((a,b) => b - a),
         total:    bagWeight,
-        lures:    '',
-        notes:    savedDay.notes || '',
-        photos:   [],
-        savedAt:  savedDay.savedAt,
-        autoAdded: true, // flag so user knows it came from a saved trip
+            fish:     JSON.parse(JSON.stringify(best5)),
+            lures:    '',
+            notes:    savedDay.notes || '',
+            photos:   [],
+            conditions: savedDay.conditions,
+            savedAt:  savedDay.savedAt,
+            autoAdded: true, // flag so user knows it came from a saved trip
       };
       bigBags.unshift(autoBag);
     }
@@ -2321,8 +2353,8 @@ function renderHistory() {
 
   // Sort
   switch(sort) {
-    case 'newest':       days.sort((a,b) => new Date(b.date) - new Date(a.date)); break;
-    case 'oldest':       days.sort((a,b) => new Date(a.date) - new Date(b.date)); break;
+    case 'newest':       days.sort((a,b) => dateSortValue(b.date) - dateSortValue(a.date)); break;
+    case 'oldest':       days.sort((a,b) => dateSortValue(a.date) - dateSortValue(b.date)); break;
     case 'heaviest-bag': days.sort((a,b) => b.bagWeight - a.bagWeight); break;
     case 'biggest-fish': days.sort((a,b) => b.biggestFish - a.biggestFish); break;
     case 'most-fish':    days.sort((a,b) => b.fishCount - a.fishCount); break;
@@ -2377,7 +2409,7 @@ function openDayDetail(id) {
       <div style="font-size:0.85rem;color:var(--c-text2);">${fmtDate(day.date)}${day.conditions ? ' &mdash; ' + escapHtml(day.conditions) : ''}</div>
     </div>
 
-    ${day.photos && day.photos.length ? `<div class="photo-gallery" style="margin:0 16px 12px;">${day.photos.map(p=>`<img src="${p}" alt="Day photo" onclick="openLightbox('${p}')" loading="lazy">`).join('')}</div>` : ''}
+    ${getDayPhotos(day).length ? `<div class="photo-gallery" style="margin:0 16px 12px;">${getDayPhotos(day).map(p=>`<img src="${p}" alt="Day photo" onclick="openLightbox('${p}')" loading="lazy">`).join('')}</div>` : ''}
 
     <div class="card card-tight" style="background:var(--c-accent-dim);border-color:rgba(34,197,94,0.25);">
       <div class="card-header" style="margin-bottom:8px;">
@@ -2475,7 +2507,7 @@ function openBigFishModal(editId) {
       document.getElementById('bf-notes').value    = fish.notes || '';
       document.getElementById('bf-is-pb').checked       = !!fish.isPB;
       document.getElementById('bf-is-notable').checked  = !!fish.isNotable;
-      pendingBfPhotos = [...(fish.photos || [])];
+      pendingBfPhotos = [...getFishPhotos(fish)];
       renderPhotoThumbs(pendingBfPhotos, 'bf-photo-previews');
     }
   } else {
@@ -2497,6 +2529,7 @@ function submitBigFish() {
   clearFieldError('bf-weight','bf-weight-err');
 
   const editId = document.getElementById('bf-edit-id').value;
+  const existingEntry = editId ? bigFish.find(f => f.id === editId) : null;
   const entry = {
     id:        editId || uid(),
     weight:    weightVal,
@@ -2508,6 +2541,7 @@ function submitBigFish() {
     photos:    [...pendingBfPhotos],
     isPB:      document.getElementById('bf-is-pb').checked,
     isNotable: document.getElementById('bf-is-notable').checked,
+    ...(existingEntry && existingEntry.sourceBagId ? { sourceBagId: existingEntry.sourceBagId } : {}),
   };
 
   if (editId) {
@@ -2569,8 +2603,8 @@ function renderBigFish() {
   if (locFilt)             fish = fish.filter(f => (f.location||'').toLowerCase().includes(locFilt));
 
   switch(sort) {
-    case 'newest':   fish.sort((a,b) => new Date(b.date) - new Date(a.date)); break;
-    case 'oldest':   fish.sort((a,b) => new Date(a.date) - new Date(b.date)); break;
+    case 'newest':   fish.sort((a,b) => dateSortValue(b.date) - dateSortValue(a.date)); break;
+    case 'oldest':   fish.sort((a,b) => dateSortValue(a.date) - dateSortValue(b.date)); break;
     case 'heaviest': fish.sort((a,b) => b.weight - a.weight); break;
     case 'lightest': fish.sort((a,b) => a.weight - b.weight); break;
     case 'location': fish.sort((a,b) => (a.location||'').localeCompare(b.location||'')); break;
@@ -2587,10 +2621,11 @@ function renderBigFish() {
   }
 
   el.innerHTML = fish.map(f => {
-    const hasPhoto = f.photos && f.photos.length;
+    const photos = getFishPhotos(f);
+    const hasPhoto = photos.length;
     return `
       <div class="record-card" role="listitem" aria-label="${fmtWeight(f.weight)} bass on ${fmtDate(f.date)}">
-        ${hasPhoto ? `<img class="record-card-photo" src="${f.photos[0]}" alt="Photo of ${fmtWeight(f.weight)} bass" onclick="openLightbox('${f.photos[0]}')" loading="lazy">` : ''}
+        ${hasPhoto ? `<img class="record-card-photo" src="${photos[0]}" alt="Photo of ${fmtWeight(f.weight)} bass" onclick="openLightbox('${photos[0]}')" loading="lazy">` : ''}
         <div class="record-card-body">
           <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
             <div>
@@ -2604,7 +2639,7 @@ function renderBigFish() {
             </div>
           </div>
           ${f.notes ? `<p style="font-size:0.82rem;color:var(--c-text2);margin-top:8px;font-style:italic;">${escapHtml(f.notes)}</p>` : ''}
-          ${f.photos && f.photos.length > 1 ? `<div class="photo-gallery" style="margin-top:8px;">${f.photos.slice(1,4).map(p=>`<img src="${p}" alt="Fish photo" onclick="openLightbox('${p}')" loading="lazy">`).join('')}</div>` : ''}
+          ${photos.length > 1 ? `<div class="photo-gallery" style="margin-top:8px;">${photos.slice(1,4).map(p=>`<img src="${p}" alt="Fish photo" onclick="openLightbox('${p}')" loading="lazy">`).join('')}</div>` : ''}
         </div>
         <div class="record-card-footer">
           <button class="btn btn-sm btn-ghost" onclick="openBigFishModal('${f.id}')" aria-label="Edit this fish entry">Edit</button>
@@ -2674,9 +2709,10 @@ document.getElementById('bag-photos').addEventListener('change', function(e) {
 
 function submitSaveBag() {
   const wIds = ['bag-w1','bag-w2','bag-w3','bag-w4','bag-w5'];
-  const weights = wIds.map(id => parseFloat(document.getElementById(id).value)).filter(v => v > 0 && v <= 30);
+  const enteredWeights = wIds.map(id => document.getElementById(id).value.trim());
+  const weights = enteredWeights.map(value => parseFloat(value)).filter(v => v > 0 && v <= 30);
 
-  if (!weights.length) {
+  if (!weights.length || enteredWeights.some(value => value && (!Number.isFinite(parseFloat(value)) || parseFloat(value) <= 0 || parseFloat(value) > 30))) {
     const errEl = document.getElementById('bag-weight-err');
     errEl.style.display = 'block';
     document.getElementById('bag-w1').classList.add('invalid');
@@ -2687,24 +2723,157 @@ function submitSaveBag() {
   document.getElementById('bag-w1').classList.remove('invalid');
 
   const total = weights.reduce((s,v) => s + v, 0);
-  const entry = {
-    id:       uid(),
-    date:     document.getElementById('bag-save-date').value || todayISO(),
-    location: document.getElementById('bag-save-location').value.trim(),
-    weights:  weights.sort((a,b) => b - a),
+  const savedAt = Date.now();
+  const bagId = uid();
+  const tripId = uid();
+  const date = document.getElementById('bag-save-date').value || todayISO();
+  const location = document.getElementById('bag-save-location').value.trim();
+  const lures = document.getElementById('bag-save-lures').value.trim();
+  const notes = document.getElementById('bag-save-notes').value.trim();
+  const photos = [...pendingBagPhotos];
+  const fishEntries = weights.sort((a,b) => b - a).map(weight => ({
+    id:        uid(),
+    weight,
+    length:    null,
+    location,
+    lure:      lures,
+    notes,
+    photos:    [],
+    isPB:      false,
+    timestamp: savedAt,
+  }));
+  const bag = {
+    id:       bagId,
+    date,
+    location,
+    weights:  fishEntries.map(fish => fish.weight),
     total,
-    lures:    document.getElementById('bag-save-lures').value.trim(),
-    notes:    document.getElementById('bag-save-notes').value.trim(),
-    photos:   [...pendingBagPhotos],
-    savedAt:  Date.now(),
+    lures,
+    notes,
+    photos,
+    fish:     JSON.parse(JSON.stringify(fishEntries)),
+    savedAt,
+    sourceTripId: tripId,
   };
 
-  bigBags.unshift(entry);
+  const trip = {
+    id:          tripId,
+    date,
+    location,
+    conditions:  '',
+    notes,
+    photos:      [],
+    fish:        JSON.parse(JSON.stringify(fishEntries)),
+    best5:       JSON.parse(JSON.stringify(fishEntries.slice(0, 5))),
+    bagWeight:   total,
+    biggestFish: Math.max(...weights),
+    fishCount:   fishEntries.length,
+    savedAt,
+    sourceBagId: bagId,
+  };
+
+  const fishLogEntries = fishEntries.map(fish => ({
+    id:          fish.id,
+    weight:      fish.weight,
+    length:      fish.length,
+    date,
+    location,
+    lure:        fish.lure,
+    notes:       fish.notes,
+    photos:      [],
+    isPB:        fish.isPB,
+    isNotable:   fish.weight >= 5.5,
+    sourceBagId: bagId,
+  }));
+
+  bigBags.unshift(bag);
+  savedDays.unshift(trip);
+  bigFish.unshift(...fishLogEntries);
   persist();
   closeModal('save-bag-modal');
   renderBagHistory();
   renderHeaderStats();
-  showToast(`Bag saved — ${fmtWeight(total)}`);
+  showToast(`Bag saved · trip and ${fishEntries.length} fish added`);
+}
+
+function migrateLegacyBagsToTrips() {
+  let migratedCount = 0;
+
+  bigBags.forEach(bag => {
+    if (bag.autoAdded) return;
+    const linkedTrip = savedDays.find(day => day.sourceBagId === bag.id || day.id === bag.sourceTripId);
+
+    const sourceFish = Array.isArray(bag.fish) && bag.fish.length
+      ? bag.fish
+      : (Array.isArray(bag.weights) ? bag.weights : []).map(weight => ({ weight }));
+    const fishEntries = sourceFish
+      .filter(fish => Number.isFinite(Number(fish.weight)) && Number(fish.weight) > 0 && Number(fish.weight) <= 30)
+      .sort((a, b) => Number(b.weight) - Number(a.weight))
+      .map((fish, index) => ({
+        id:        fish.id || `${bag.id}_fish_${index + 1}`,
+        weight:    Number(fish.weight),
+        length:    fish.length || null,
+        location:  fish.location || bag.location || '',
+        lure:      fish.lure || bag.lures || '',
+        notes:     fish.notes || bag.notes || '',
+        photos:    [],
+        isPB:      !!fish.isPB,
+        timestamp: fish.timestamp || bag.savedAt || Date.now(),
+      }));
+    if (!fishEntries.length) return;
+
+    const tripId = (linkedTrip && linkedTrip.id) || bag.sourceTripId || `${bag.id}_trip`;
+    const trip = {
+      id:          tripId,
+      date:        bag.date || todayISO(),
+      location:    bag.location || '',
+      conditions:  bag.conditions || '',
+      notes:       bag.notes || '',
+      photos:      [],
+      fish:        JSON.parse(JSON.stringify(fishEntries)),
+      best5:       JSON.parse(JSON.stringify(fishEntries.slice(0, 5))),
+      bagWeight:   Number.isFinite(Number(bag.total)) ? Number(bag.total) : getBagTotal(fishEntries),
+      biggestFish: Math.max(...fishEntries.map(fish => fish.weight)),
+      fishCount:   fishEntries.length,
+      savedAt:     bag.savedAt || Date.now(),
+      sourceBagId: bag.id,
+    };
+    const fishLogEntries = fishEntries.map(fish => ({
+      id:          fish.id,
+      weight:      fish.weight,
+      length:      fish.length,
+      date:        trip.date,
+      location:    fish.location,
+      lure:        fish.lure,
+      notes:       fish.notes,
+      photos:      [],
+      isPB:        fish.isPB,
+      isNotable:   fish.weight >= 5.5,
+      sourceBagId: bag.id,
+    }));
+
+    let changed = false;
+    if (bag.sourceTripId !== tripId) {
+      bag.sourceTripId = tripId;
+      changed = true;
+    }
+    if (!linkedTrip) {
+      savedDays.unshift(trip);
+      changed = true;
+    }
+    if (!Array.isArray(bag.fish) || !bag.fish.length) {
+      bag.fish = JSON.parse(JSON.stringify(fishEntries));
+      changed = true;
+    }
+    const missingFishEntries = fishLogEntries.filter(fish => !bigFish.some(entry => entry.id === fish.id));
+    if (missingFishEntries.length) {
+      bigFish.unshift(...missingFishEntries);
+      changed = true;
+    }
+    if (changed) migratedCount++;
+  });
+
+  return migratedCount;
 }
 
 function renderBagHistory() {
@@ -2715,8 +2884,8 @@ function renderBagHistory() {
   if (locFilt) bags = bags.filter(b => (b.location||'').toLowerCase().includes(locFilt));
 
   switch(sort) {
-    case 'newest':      bags.sort((a,b) => new Date(b.date) - new Date(a.date)); break;
-    case 'oldest':      bags.sort((a,b) => new Date(a.date) - new Date(b.date)); break;
+    case 'newest':      bags.sort((a,b) => dateSortValue(b.date) - dateSortValue(a.date)); break;
+    case 'oldest':      bags.sort((a,b) => dateSortValue(a.date) - dateSortValue(b.date)); break;
     case 'heaviest':    bags.sort((a,b) => b.total - a.total); break;
     case 'biggest-fish':bags.sort((a,b) => Math.max(...b.weights) - Math.max(...a.weights)); break;
     case 'location':    bags.sort((a,b) => (a.location||'').localeCompare(b.location||'')); break;
@@ -2736,8 +2905,8 @@ function renderBagHistory() {
     const biggestW = Math.max(...bag.weights);
     const hasPhoto = bag.photos && bag.photos.length;
     return `
-      <div class="record-card" role="listitem" aria-label="${fmtWeight(bag.total)} bag on ${fmtDate(bag.date)}">
-        ${hasPhoto ? `<img class="record-card-photo" src="${bag.photos[0]}" alt="Bag photo" onclick="openLightbox('${bag.photos[0]}')" loading="lazy">` : ''}
+      <div class="record-card bag-record-card" role="listitem" tabindex="0" onclick="openBagDetail('${bag.id}')" onkeydown="if(event.target===event.currentTarget&&(event.key==='Enter'||event.key===' ')){event.preventDefault();openBagDetail('${bag.id}')}" aria-label="View ${fmtWeight(bag.total)} bag on ${fmtDate(bag.date)}">
+        ${hasPhoto ? `<img class="record-card-photo" src="${bag.photos[0]}" alt="Bag photo" onclick="event.stopPropagation();openLightbox('${bag.photos[0]}')" loading="lazy">` : ''}
         <div class="record-card-body">
           <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
             <div>
@@ -2752,10 +2921,69 @@ function renderBagHistory() {
           ${bag.notes ? `<p style="font-size:0.82rem;color:var(--c-text2);margin-top:8px;font-style:italic;">${escapHtml(bag.notes)}</p>` : ''}
         </div>
         <div class="record-card-footer">
-          <button class="btn btn-sm btn-danger" onclick="confirmDeleteBag('${bag.id}')" aria-label="Delete this bag record">Delete</button>
+          <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();confirmDeleteBag('${bag.id}')" aria-label="Delete this bag record">Delete</button>
         </div>
       </div>`;
   }).join('');
+}
+
+function openBagDetail(id) {
+  const bag = bigBags.find(b => b.id === id);
+  if (!bag) return;
+
+  document.getElementById('bag-list').style.display = 'none';
+  document.getElementById('bag-detail-view').style.display = 'block';
+
+  const linkedDay = bag.autoAdded && bag.id.endsWith('_bag')
+    ? savedDays.find(day => `${day.id}_bag` === bag.id)
+    : null;
+  const fish = Array.isArray(bag.fish) && bag.fish.length
+    ? bag.fish
+    : linkedDay ? (linkedDay.best5 || getBest5(linkedDay.fish || [])) : [];
+  const weights = Array.isArray(bag.weights) ? bag.weights : fish.map(f => f.weight);
+  const conditions = bag.conditions || (linkedDay && linkedDay.conditions);
+  const detailEl = document.getElementById('bag-detail-content');
+
+  detailEl.innerHTML = `
+    <div style="padding:0 16px 10px;">
+      <h2 style="margin-bottom:4px;">${escapHtml(bag.location || 'Bag Details')}</h2>
+      <div style="font-size:0.85rem;color:var(--c-text2);">${fmtDate(bag.date)}${conditions ? ' &mdash; ' + escapHtml(conditions) : ''}</div>
+      ${bag.autoAdded ? '<div class="label-sm" style="margin-top:6px;">Saved from trip</div>' : ''}
+    </div>
+
+    ${bag.photos && bag.photos.length ? `<div class="photo-gallery" style="margin:0 16px 12px;">${bag.photos.map(p=>`<img src="${p}" alt="Bag photo" onclick="openLightbox('${p}')" loading="lazy">`).join('')}</div>` : ''}
+
+    <div class="card card-tight" style="background:var(--c-accent-dim);border-color:rgba(34,197,94,0.25);">
+      <div class="card-header" style="margin-bottom:8px;">
+        <h3>Bag Total — ${fmtWeight(bag.total)}</h3>
+      </div>
+      ${weights.map((weight, i) => {
+        const fishEntry = fish[i];
+        const details = fishEntry
+          ? [fishEntry.length ? `${fishEntry.length}"` : '', fishEntry.lure, fishEntry.location].filter(Boolean).join(' · ')
+          : '';
+        return `
+          <div class="bag-fish-row" style="border-color:rgba(34,197,94,0.15);">
+            <span class="fish-rank${i===0?' biggest':''}">#${i+1}</span>
+            <span class="fish-weight-big">${fmtWeight(weight)}</span>
+            <span class="fish-details-sm">${escapHtml(details)}</span>
+            ${fishEntry && fishEntry.isPB ? '<span class="pb-badge">PB</span>' : ''}
+          </div>
+          ${fishEntry && fishEntry.notes ? `<div class="card-tight" style="font-size:0.85rem;color:var(--c-text2);font-style:italic;">${escapHtml(fishEntry.notes)}</div>` : ''}
+          ${fishEntry && getFishPhotos(fishEntry).length ? `<div class="photo-gallery" style="margin:6px 0 12px;">${getFishPhotos(fishEntry).map(p=>`<img src="${p}" alt="Photo of ${fmtWeight(weight)} bass" onclick="openLightbox('${p}')" loading="lazy">`).join('')}</div>` : ''}
+        `;
+      }).join('')}
+      ${Array.from({length: Math.max(0, 5-weights.length)}).map((_,i)=>`<div class="bag-empty-slot"><span class="empty-slot-rank">#${weights.length+i+1}</span><span class="empty-slot-dash">empty</span></div>`).join('')}
+    </div>
+
+    ${bag.lures ? `<div class="card card-tight"><div class="label-sm" style="margin-bottom:6px;">Lure Patterns</div><p>${escapHtml(bag.lures)}</p></div>` : ''}
+    ${bag.notes ? `<div class="card card-tight"><div class="label-sm" style="margin-bottom:6px;">Notes</div><p style="font-size:0.88rem;color:var(--c-text2);font-style:italic;">${escapHtml(bag.notes)}</p></div>` : ''}
+  `;
+}
+
+function closeBagDetail() {
+  document.getElementById('bag-list').style.display = 'block';
+  document.getElementById('bag-detail-view').style.display = 'none';
 }
 
 function confirmDeleteBag(id) {
@@ -3026,10 +3254,11 @@ function importData() {
             if (data.savedDays)  savedDays  = data.savedDays;
             if (data.bigFish)    bigFish    = data.bigFish;
             if (data.bigBags)    bigBags    = data.bigBags;
+            const migratedBagCount = migrateLegacyBagsToTrips();
             persist();
             renderToday();
             renderHeaderStats();
-            showToast('Backup restored');
+            showToast(migratedBagCount ? `Backup restored · updated ${migratedBagCount} bag${migratedBagCount === 1 ? '' : 's'} to Trips and Fish Log` : 'Backup restored');
           }
         );
       } catch(err) {
@@ -3074,7 +3303,7 @@ async function githubBackup(silent = false) {
     const sha = existing.ok ? existing.data.sha : undefined;
 
     const result = await ghRequest('PUT', filePath, {
-      message: `Bass Tracker auto-backup ${new Date().toISOString().slice(0,10)}`,
+      message: `Bass Tracker auto-backup ${todayISO()}`,
       content,
       ...(sha ? { sha } : {}),
     }, cfg.token);
@@ -3124,10 +3353,11 @@ async function githubRestore() {
         if (data.savedDays)  savedDays  = data.savedDays;
         if (data.bigFish)    bigFish    = data.bigFish;
         if (data.bigBags)    bigBags    = data.bigBags;
+        const migratedBagCount = migrateLegacyBagsToTrips();
         persist();
         renderToday();
         renderHeaderStats();
-        showToast('✓ Restored from GitHub');
+        showToast(migratedBagCount ? `Restored · updated ${migratedBagCount} bag${migratedBagCount === 1 ? '' : 's'} to Trips and Fish Log` : '✓ Restored from GitHub');
       }
     );
   } catch(err) {
@@ -3255,6 +3485,8 @@ function closeDataMenu() {
    INIT
    ======================================================== */
 
+const migratedBagCount = migrateLegacyBagsToTrips();
+if (migratedBagCount) persist();
 renderToday();
 renderHeaderStats();
 checkRestoreOnLaunch();
