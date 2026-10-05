@@ -765,6 +765,7 @@ input.invalid, textarea.invalid, select.invalid {
 }
 
 .bag-record-card { cursor: pointer; }
+.bag-record-card .record-card-footer { justify-content: flex-end; }
 
 .record-card-photo {
   width: 100%;
@@ -2921,6 +2922,7 @@ function renderBagHistory() {
           ${bag.notes ? `<p style="font-size:0.82rem;color:var(--c-text2);margin-top:8px;font-style:italic;">${escapHtml(bag.notes)}</p>` : ''}
         </div>
         <div class="record-card-footer">
+          <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation();openBagDetail('${bag.id}')" aria-label="View bag details for ${fmtWeight(bag.total)} bag">View Details</button>
           <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();confirmDeleteBag('${bag.id}')" aria-label="Delete this bag record">Delete</button>
         </div>
       </div>`;
