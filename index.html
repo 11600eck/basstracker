@@ -14,28 +14,30 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  /* Colors */
-  --c-bg:        #0e1118;
-  --c-bg2:       #161b24;
-  --c-bg3:       #1e2633;
-  --c-surface:   #242d3a;
-  --c-surface2:  #2c3644;
-  --c-border:    #334155;
-  --c-border2:   #475569;
+  /* Colors — navy + blue palette. Contrast checked against WCAG 2.2 AA:
+     text tokens >= 4.5:1 on every bg/surface, UI borders/focus >= 3:1. */
+  --c-bg:        #0a1220;
+  --c-bg2:       #0f1a2d;
+  --c-bg3:       #16243b;
+  --c-surface:   #1a2b46;
+  --c-surface2:  #223658;
+  --c-border:    #2c4268;   /* decorative dividers */
+  --c-border2:   #6383b3;   /* control outlines (>= 3:1) */
 
-  --c-text:      #f0f4f8;
-  --c-text2:     #94a3b8;
-  --c-text3:     #64748b;
+  --c-text:      #f1f5fb;
+  --c-text2:     #b4c4dc;
+  --c-text3:     #93a8c7;
 
-  --c-accent:    #22c55e;   /* green */
-  --c-accent2:   #16a34a;
-  --c-accent-dim:#14532d;
-  --c-blue:      #3b82f6;
-  --c-blue-dim:  #1e3a5f;
-  --c-amber:     #f59e0b;
-  --c-amber-dim: #451a03;
-  --c-red:       #ef4444;
-  --c-red-dim:   #450a0a;
+  --c-accent:    #60a5fa;   /* blue */
+  --c-accent2:   #93c5fd;
+  --c-accent-dim:#0f2d57;
+  --c-on-accent: #06111f;   /* text/icons on accent, red, amber fills */
+  --c-cyan:      #22d3ee;
+  --c-cyan-dim:  #083344;
+  --c-amber:     #fbbf24;
+  --c-amber-dim: #3d2402;
+  --c-red:       #fc9a9a;
+  --c-red-dim:   #3f0d0d;
 
   /* Typography */
   --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
@@ -227,20 +229,20 @@ p  { line-height: 1.6; }
 .btn:active { transform: scale(0.97); }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
-.btn-primary  { background: var(--c-accent); color: #fff; }
+.btn-primary  { background: var(--c-accent); color: var(--c-on-accent); }
 .btn-primary:hover { background: var(--c-accent2); }
 
 .btn-secondary { background: var(--c-surface2); color: var(--c-text); border: 1px solid var(--c-border2); }
 .btn-secondary:hover { border-color: var(--c-accent); }
 
 .btn-danger  { background: var(--c-red-dim); color: var(--c-red); border: 1px solid var(--c-red); }
-.btn-danger:hover { background: var(--c-red); color: #fff; }
+.btn-danger:hover { background: var(--c-red); color: var(--c-on-accent); }
 
 .btn-ghost   { background: transparent; color: var(--c-text2); border: 1px solid var(--c-border); }
 .btn-ghost:hover { border-color: var(--c-border2); color: var(--c-text); }
 
 .btn-amber   { background: var(--c-amber-dim); color: var(--c-amber); border: 1px solid var(--c-amber); }
-.btn-amber:hover { background: var(--c-amber); color: #000; }
+.btn-amber:hover { background: var(--c-amber); color: var(--c-on-accent); }
 
 .btn-sm { padding: 8px 12px; font-size: 0.8rem; min-height: 38px; }
 .btn-lg { padding: 16px 24px; font-size: 1rem; min-height: 56px; width: 100%; }
@@ -282,7 +284,7 @@ textarea,
 select {
   width: 100%;
   background: var(--c-bg3);
-  border: 1px solid var(--c-border);
+  border: 1px solid var(--c-border2);
   border-radius: var(--r);
   padding: 12px 14px;
   font-size: 1rem;
@@ -297,7 +299,7 @@ select {
 input:focus, textarea:focus, select:focus {
   border-color: var(--c-accent);
   outline: none;
-  box-shadow: 0 0 0 3px rgba(34,197,94,0.18);
+  box-shadow: 0 0 0 3px rgba(96,165,250,0.18);
 }
 
 input::placeholder, textarea::placeholder { color: var(--c-text3); }
@@ -342,7 +344,7 @@ select {
   position: relative;
 }
 
-.photo-picker:hover { border-color: var(--c-accent); background: rgba(34,197,94,0.05); }
+.photo-picker:hover { border-color: var(--c-accent); background: rgba(96,165,250,0.05); }
 
 .photo-picker input[type="file"] {
   position: absolute;
@@ -436,7 +438,7 @@ input.invalid, textarea.invalid, select.invalid {
 
 .bag-total-bar {
   background: var(--c-accent-dim);
-  border-bottom: 1px solid rgba(34,197,94,0.25);
+  border-bottom: 1px solid rgba(96,165,250,0.25);
   padding: 12px 16px;
   display: flex;
   align-items: center;
@@ -530,7 +532,6 @@ input.invalid, textarea.invalid, select.invalid {
   gap: 10px;
   padding: 9px 4px;
   border-bottom: 1px solid var(--c-border);
-  opacity: 0.45;
 }
 .bag-empty-slot:last-child { border-bottom: none; }
 
@@ -565,9 +566,9 @@ input.invalid, textarea.invalid, select.invalid {
 
 .notable-badge {
   display: inline-block;
-  background: var(--c-blue-dim);
-  color: var(--c-blue);
-  border: 1px solid var(--c-blue);
+  background: var(--c-cyan-dim);
+  color: var(--c-cyan);
+  border: 1px solid var(--c-cyan);
   border-radius: 4px;
   font-size: 0.65rem;
   font-weight: 700;
@@ -589,7 +590,7 @@ input.invalid, textarea.invalid, select.invalid {
 }
 
 .fish-card.in-bag {
-  border-color: rgba(34,197,94,0.35);
+  border-color: rgba(96,165,250,0.35);
 }
 
 .fish-card-header {
@@ -1161,7 +1162,7 @@ input[type="checkbox"].toggle:checked {
 
 input[type="checkbox"].toggle:checked::after {
   left: 20px;
-  background: #fff;
+  background: var(--c-on-accent);
 }
 
 /* ========================================================
@@ -1277,7 +1278,7 @@ select {
 <body>
 
 <!-- Skip navigation for accessibility -->
-<a href="#main-content" class="sr-only" style="position:absolute;top:6px;left:6px;background:var(--c-accent);color:#000;padding:8px 14px;border-radius:6px;font-weight:700;z-index:9999;display:block;">Skip to content</a>
+<a href="#main-content" class="sr-only" style="position:absolute;top:6px;left:6px;background:var(--c-accent);color:var(--c-on-accent);padding:8px 14px;border-radius:6px;font-weight:700;z-index:9999;display:block;">Skip to content</a>
 
 <!-- ============================================================
      APP HEADER
@@ -1464,12 +1465,12 @@ select {
           <div style="margin-bottom:12px;">
             <label for="gh-token" style="display:block;font-size:0.8rem;font-weight:600;color:var(--c-text2);margin-bottom:6px;">Personal Access Token</label>
             <input type="password" id="gh-token" placeholder="ghp_xxxxxxxxxxxx" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
-              style="width:100%;background:var(--c-bg3);border:1px solid var(--c-border);border-radius:var(--r);padding:12px 14px;font-size:0.9rem;color:var(--c-text);font-family:var(--font-mono);">
+              style="width:100%;background:var(--c-bg3);border:1px solid var(--c-border2);border-radius:var(--r);padding:12px 14px;font-size:0.9rem;color:var(--c-text);font-family:var(--font-mono);">
           </div>
           <div style="margin-bottom:14px;">
             <label for="gh-repo" style="display:block;font-size:0.8rem;font-weight:600;color:var(--c-text2);margin-bottom:6px;">Repository (username/repo-name)</label>
             <input type="text" id="gh-repo" placeholder="yourname/bass-tracker-data" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
-              style="width:100%;background:var(--c-bg3);border:1px solid var(--c-border);border-radius:var(--r);padding:12px 14px;font-size:0.9rem;color:var(--c-text);">
+              style="width:100%;background:var(--c-bg3);border:1px solid var(--c-border2);border-radius:var(--r);padding:12px 14px;font-size:0.9rem;color:var(--c-text);">
           </div>
           <button onclick="saveGHSettingsInline()" class="btn btn-primary" style="width:100%;margin-bottom:8px;">Save & Test Connection</button>
           <button onclick="githubBackup(false)" class="btn btn-secondary" style="width:100%;margin-bottom:8px;">☁ Backup to GitHub Now</button>
@@ -1770,7 +1771,7 @@ select {
           <div class="photo-thumbs" id="bag-photo-previews"></div>
         </div>
 
-        <div id="bag-total-preview" style="background:var(--c-accent-dim);border:1px solid rgba(34,197,94,0.3);border-radius:var(--r);padding:12px 14px;margin-bottom:14px;display:none;">
+        <div id="bag-total-preview" style="background:var(--c-accent-dim);border:1px solid rgba(96,165,250,0.3);border-radius:var(--r);padding:12px 14px;margin-bottom:14px;display:none;">
           <div style="font-size:0.75rem;color:var(--c-text2);text-transform:uppercase;letter-spacing:0.07em;">Bag Total</div>
           <div id="bag-total-preview-val" style="font-size:1.4rem;font-weight:800;color:var(--c-accent);"></div>
         </div>
@@ -2479,12 +2480,12 @@ function openDayDetail(id) {
 
     ${getDayPhotos(day).length ? `<div class="photo-gallery" style="margin:0 16px 12px;">${getDayPhotos(day).map(p=>`<img src="${p}" alt="Day photo" onclick="openLightbox('${p}')" loading="lazy">`).join('')}</div>` : ''}
 
-    <div class="card card-tight" style="background:var(--c-accent-dim);border-color:rgba(34,197,94,0.25);">
+    <div class="card card-tight" style="background:var(--c-accent-dim);border-color:rgba(96,165,250,0.25);">
       <div class="card-header" style="margin-bottom:8px;">
         <h3>Best 5 Bag — ${fmtWeight(day.bagWeight)}</h3>
       </div>
       ${best5.map((f,i) => `
-        <div class="bag-fish-row" style="border-color:rgba(34,197,94,0.15);">
+        <div class="bag-fish-row" style="border-color:rgba(96,165,250,0.15);">
           <span class="fish-rank${i===0?' biggest':''}">#${i+1}</span>
           <span class="fish-weight-big">${fmtWeight(f.weight)}</span>
           <span class="fish-details-sm">${escapHtml([f.lure,f.location].filter(Boolean).join(' — '))}</span>
@@ -3019,7 +3020,7 @@ function openBagDetail(id) {
 
     ${bag.photos && bag.photos.length ? `<div class="photo-gallery" style="margin:0 16px 12px;">${bag.photos.map(p=>`<img src="${p}" alt="Bag photo" onclick="openLightbox('${p}')" loading="lazy">`).join('')}</div>` : ''}
 
-    <div class="card card-tight" style="background:var(--c-accent-dim);border-color:rgba(34,197,94,0.25);">
+    <div class="card card-tight" style="background:var(--c-accent-dim);border-color:rgba(96,165,250,0.25);">
       <div class="card-header" style="margin-bottom:8px;">
         <h3>Bag Total — ${fmtWeight(bag.total)}</h3>
       </div>
@@ -3029,7 +3030,7 @@ function openBagDetail(id) {
           ? [fishEntry.length ? `${fishEntry.length}"` : '', fishEntry.lure, fishEntry.location].filter(Boolean).join(' · ')
           : '';
         return `
-          <div class="bag-fish-row" style="border-color:rgba(34,197,94,0.15);">
+          <div class="bag-fish-row" style="border-color:rgba(96,165,250,0.15);">
             <span class="fish-rank${i===0?' biggest':''}">#${i+1}</span>
             <span class="fish-weight-big">${fmtWeight(weight)}</span>
             <span class="fish-details-sm">${escapHtml(details)}</span>
@@ -3462,20 +3463,20 @@ function openGHSettings() {
       <div style="margin-bottom:14px;">
         <label style="display:block;font-size:0.8rem;font-weight:600;color:var(--c-text2);margin-bottom:6px;">GitHub Personal Access Token</label>
         <input id="gh-token-input" type="password" placeholder="ghp_xxxxxxxxxxxx"
-          style="width:100%;background:var(--c-bg3);border:1px solid var(--c-border);border-radius:var(--r);padding:12px 14px;font-size:0.95rem;color:var(--c-text);font-family:var(--font-mono);"
+          style="width:100%;background:var(--c-bg3);border:1px solid var(--c-border2);border-radius:var(--r);padding:12px 14px;font-size:0.95rem;color:var(--c-text);font-family:var(--font-mono);"
           value="${cfg.token || ''}">
       </div>
 
       <div style="margin-bottom:18px;">
         <label style="display:block;font-size:0.8rem;font-weight:600;color:var(--c-text2);margin-bottom:6px;">Repository (username/repo-name)</label>
         <input id="gh-repo-input" type="text" placeholder="yourname/bass-tracker-data"
-          style="width:100%;background:var(--c-bg3);border:1px solid var(--c-border);border-radius:var(--r);padding:12px 14px;font-size:0.95rem;color:var(--c-text);"
+          style="width:100%;background:var(--c-bg3);border:1px solid var(--c-border2);border-radius:var(--r);padding:12px 14px;font-size:0.95rem;color:var(--c-text);"
           value="${cfg.repo || ''}">
       </div>
 
       ${cfg.lastBackup ? `<p style="font-size:0.78rem;color:var(--c-accent);margin-bottom:14px;">✓ Last backup: ${cfg.lastBackup.slice(0,10)}</p>` : ''}
 
-      <button onclick="saveGHSettings()" style="width:100%;padding:14px;background:var(--c-accent);border:none;border-radius:var(--r);font-size:1rem;font-weight:700;color:#fff;cursor:pointer;margin-bottom:10px;">Save & Test Connection</button>
+      <button onclick="saveGHSettings()" style="width:100%;padding:14px;background:var(--c-accent);border:none;border-radius:var(--r);font-size:1rem;font-weight:700;color:var(--c-on-accent);cursor:pointer;margin-bottom:10px;">Save & Test Connection</button>
       <button onclick="githubRestore();document.getElementById('gh-overlay').remove();" style="width:100%;padding:13px;background:transparent;border:1px solid var(--c-border2);border-radius:var(--r);font-size:0.95rem;font-weight:500;color:var(--c-text2);cursor:pointer;margin-bottom:10px;">Restore from GitHub</button>
       <button onclick="document.getElementById('gh-overlay').remove();" style="width:100%;padding:13px;background:transparent;border:none;font-size:0.9rem;color:var(--c-text3);cursor:pointer;">Cancel</button>
     </div>
