@@ -2864,11 +2864,47 @@ function submitSaveBag() {
   showToast(`Bag saved · trip and ${fishEntries.length} fish added`);
 }
 
+// Heavier than any single smallmouth we expect to log, so a "fish" over this is really a bag total
+const MAX_SINGLE_FISH_LB = 11;
+
+// Older imported bags only recorded the bag total, stored as weights: [total]
+function isTotalOnlyBag(bag) {
+  return !bag.autoAdded
+    && Array.isArray(bag.weights)
+    && bag.weights.length === 1
+    && Number(bag.weights[0]) > MAX_SINGLE_FISH_LB;
+}
+
+function bagBiggestFish(bag) {
+  return isTotalOnlyBag(bag) ? 0 : Math.max(...bag.weights);
+}
+
+// Undo an earlier migration that turned total-only bags into one giant fish
+function removeTotalOnlyBagMigrations() {
+  const ids = new Set(bigBags.filter(isTotalOnlyBag).map(bag => bag.id));
+  if (!ids.size) return 0;
+
+  const daysBefore = savedDays.length;
+  const fishBefore = bigFish.length;
+  savedDays = savedDays.filter(day => !(ids.has(day.sourceBagId) && day.id === `${day.sourceBagId}_trip`));
+  bigFish   = bigFish.filter(fish => !(ids.has(fish.sourceBagId) && String(fish.id).startsWith(`${fish.sourceBagId}_fish_`)));
+
+  let bagsCleaned = 0;
+  bigBags.forEach(bag => {
+    if (!ids.has(bag.id) || !(bag.fish || bag.sourceTripId)) return;
+    delete bag.fish;
+    delete bag.sourceTripId;
+    bagsCleaned++;
+  });
+
+  return (daysBefore - savedDays.length) + (fishBefore - bigFish.length) + bagsCleaned;
+}
+
 function migrateLegacyBagsToTrips() {
   let migratedCount = 0;
 
   bigBags.forEach(bag => {
-    if (bag.autoAdded) return;
+    if (bag.autoAdded || isTotalOnlyBag(bag)) return;
     const linkedTrip = savedDays.find(day => day.sourceBagId === bag.id || day.id === bag.sourceTripId);
     const sourceFish = Array.isArray(bag.fish) && bag.fish.length
       ? bag.fish
@@ -2954,7 +2990,7 @@ function renderBagHistory() {
     case 'newest':      bags.sort((a,b) => new Date(b.date) - new Date(a.date)); break;
     case 'oldest':      bags.sort((a,b) => new Date(a.date) - new Date(b.date)); break;
     case 'heaviest':    bags.sort((a,b) => b.total - a.total); break;
-    case 'biggest-fish':bags.sort((a,b) => Math.max(...b.weights) - Math.max(...a.weights)); break;
+    case 'biggest-fish':bags.sort((a,b) => bagBiggestFish(b) - bagBiggestFish(a)); break;
     case 'location':    bags.sort((a,b) => (a.location||'').localeCompare(b.location||'')); break;
   }
 
@@ -2982,9 +3018,11 @@ function renderBagHistory() {
               <div class="record-card-date">${fmtDate(bag.date)}${bag.lures ? ' &mdash; ' + escapHtml(bag.lures) : ''}</div>
             </div>
           </div>
-          <div class="bag-weights-row">
+          ${isTotalOnlyBag(bag)
+            ? `<div class="record-card-date" style="margin-top:8px;">Bag total only &mdash; fish weights not recorded</div>`
+            : `<div class="bag-weights-row">
             ${bag.weights.map(w => `<span class="bag-weight-pill${w === biggestW ? ' biggest' : ''}">${fmtWeight(w)}</span>`).join('')}
-          </div>
+          </div>`}
           ${bag.notes ? `<p style="font-size:0.82rem;color:var(--c-text2);margin-top:8px;font-style:italic;">${escapHtml(bag.notes)}</p>` : ''}
         </div>
         <div class="record-card-footer">
@@ -3008,7 +3046,7 @@ function openBagDetail(id) {
   const fish = Array.isArray(bag.fish) && bag.fish.length
     ? bag.fish
     : linkedDay ? (linkedDay.best5 || getBest5(linkedDay.fish || [])) : [];
-  const weights = Array.isArray(bag.weights) ? bag.weights : fish.map(f => f.weight);
+  const weights = isTotalOnlyBag(bag) ? [] : Array.isArray(bag.weights) ? bag.weights : fish.map(f => f.weight);
   const conditions = bag.conditions || (linkedDay && linkedDay.conditions);
 
   document.getElementById('bag-detail-content').innerHTML = `
@@ -3024,6 +3062,7 @@ function openBagDetail(id) {
       <div class="card-header" style="margin-bottom:8px;">
         <h3>Bag Total — ${fmtWeight(bag.total)}</h3>
       </div>
+      ${isTotalOnlyBag(bag) ? `<p style="font-size:0.88rem;color:var(--c-text2);">Only the bag total was recorded for this bag &mdash; individual fish weights weren't saved.</p>` : ''}
       ${weights.map((weight, i) => {
         const fishEntry = fish[i];
         const details = fishEntry
@@ -3040,7 +3079,7 @@ function openBagDetail(id) {
           ${fishEntry && getFishPhotos(fishEntry).length ? `<div class="photo-gallery" style="margin:6px 0 12px;">${getFishPhotos(fishEntry).map(p=>`<img src="${p}" alt="Photo of ${fmtWeight(weight)} bass" onclick="openLightbox('${p}')" loading="lazy">`).join('')}</div>` : ''}
         `;
       }).join('')}
-      ${Array.from({length: Math.max(0, 5-weights.length)}).map((_,i)=>`<div class="bag-empty-slot"><span class="empty-slot-rank">#${weights.length+i+1}</span><span class="empty-slot-dash">empty</span></div>`).join('')}
+      ${isTotalOnlyBag(bag) ? '' : Array.from({length: Math.max(0, 5-weights.length)}).map((_,i)=>`<div class="bag-empty-slot"><span class="empty-slot-rank">#${weights.length+i+1}</span><span class="empty-slot-dash">empty</span></div>`).join('')}
     </div>
 
     ${bag.lures ? `<div class="card card-tight"><div class="label-sm" style="margin-bottom:6px;">Lure Patterns</div><p>${escapHtml(bag.lures)}</p></div>` : ''}
@@ -3321,6 +3360,7 @@ function importData() {
             if (data.savedDays)  savedDays  = data.savedDays;
             if (data.bigFish)    bigFish    = data.bigFish;
             if (data.bigBags)    bigBags    = data.bigBags;
+            removeTotalOnlyBagMigrations();
             const migratedBagCount = migrateLegacyBagsToTrips();
             persist();
             renderToday();
@@ -3420,6 +3460,7 @@ async function githubRestore() {
         if (data.savedDays)  savedDays  = data.savedDays;
         if (data.bigFish)    bigFish    = data.bigFish;
         if (data.bigBags)    bigBags    = data.bigBags;
+        removeTotalOnlyBagMigrations();
         const migratedBagCount = migrateLegacyBagsToTrips();
         persist();
         renderToday();
@@ -3552,8 +3593,9 @@ function closeDataMenu() {
    INIT
    ======================================================== */
 
+const cleanedBagRecords = removeTotalOnlyBagMigrations();
 const migratedBagCount = migrateLegacyBagsToTrips();
-if (migratedBagCount) persist();
+if (cleanedBagRecords || migratedBagCount) persist();
 buildSuggestions();
 renderToday();
 renderHeaderStats();
