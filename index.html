@@ -1843,30 +1843,80 @@ BigFish: { id, weight, length, date, location, lure, notes, photos[], isPB, isNo
 BigBag:  { id, date, location, weights[], total, lures, notes, photos[], savedAt, fish[]?, sourceTripId? }
 */
 
-function loadData(key) {
+/* App data lives in IndexedDB: photos are stored as base64, and localStorage's
+   ~5 MB quota filled up and silently dropped saves (e.g. a new PB with photos). */
+const IDB_NAME  = 'bass-tracker';
+const IDB_STORE = 'kv';
+let idbPromise = null;
+
+function openIDB() {
+  if (!idbPromise) {
+    idbPromise = new Promise((resolve, reject) => {
+      const req = indexedDB.open(IDB_NAME, 1);
+      req.onupgradeneeded = () => req.result.createObjectStore(IDB_STORE);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror   = () => reject(req.error);
+    });
+  }
+  return idbPromise;
+}
+
+async function idbGet(key) {
+  const db = await openIDB();
+  return new Promise((resolve, reject) => {
+    const req = db.transaction(IDB_STORE, 'readonly').objectStore(IDB_STORE).get(key);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror   = () => reject(req.error);
+  });
+}
+
+async function idbSet(key, val) {
+  const db = await openIDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readwrite');
+    tx.objectStore(IDB_STORE).put(val, key);
+    tx.oncomplete = () => resolve();
+    tx.onerror    = () => reject(tx.error);
+    tx.onabort    = () => reject(tx.error);
+  });
+}
+
+function loadLegacyData(key) {
   try {
     const raw = localStorage.getItem(key);
     return raw ? JSON.parse(raw) : null;
   } catch(e) { return null; }
 }
 
-function saveData(key, val) {
-  try {
-    localStorage.setItem(key, JSON.stringify(val));
-  } catch(e) {
-    showToast('Storage full — export a backup first.');
+/* Reads from IndexedDB, migrating any data still in localStorage on first run */
+async function loadData(key) {
+  const val = await idbGet(key);
+  if (val !== undefined) return val;
+  const legacy = loadLegacyData(key);
+  if (legacy !== null) {
+    await idbSet(key, legacy);
+    localStorage.removeItem(key);
   }
+  return legacy;
+}
+
+function saveData(key, val) {
+  // Clone synchronously so later in-memory edits can't race the async write
+  const snapshot = JSON.parse(JSON.stringify(val));
+  return idbSet(key, snapshot).catch(() => {
+    showToast('Save FAILED — storage full. Export a backup now.');
+  });
 }
 
 function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2);
 }
 
-/* Load initial state */
-let currentDay = loadData(STORAGE_KEYS.currentDay) || newCurrentDay();
-let savedDays  = loadData(STORAGE_KEYS.savedDays)  || [];
-let bigFish    = loadData(STORAGE_KEYS.bigFish)    || [];
-let bigBags    = loadData(STORAGE_KEYS.bigBags)    || [];
+/* State is loaded asynchronously in initApp() */
+let currentDay = null;
+let savedDays  = [];
+let bigFish    = [];
+let bigBags    = [];
 
 function newCurrentDay() {
   return {
@@ -3593,13 +3643,29 @@ function closeDataMenu() {
    INIT
    ======================================================== */
 
-const cleanedBagRecords = removeTotalOnlyBagMigrations();
-const migratedBagCount = migrateLegacyBagsToTrips();
-if (cleanedBagRecords || migratedBagCount) persist();
-buildSuggestions();
-renderToday();
-renderHeaderStats();
-checkRestoreOnLaunch();
+async function initApp() {
+  try {
+    currentDay = (await loadData(STORAGE_KEYS.currentDay)) || newCurrentDay();
+    savedDays  = (await loadData(STORAGE_KEYS.savedDays))  || [];
+    bigFish    = (await loadData(STORAGE_KEYS.bigFish))    || [];
+    bigBags    = (await loadData(STORAGE_KEYS.bigBags))    || [];
+  } catch(e) {
+    currentDay = currentDay || newCurrentDay();
+    showToast('Could not open storage — data will not be saved');
+  }
+  // Ask the browser not to evict our data under storage pressure
+  if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+
+  const cleanedBagRecords = removeTotalOnlyBagMigrations();
+  const migratedBagCount = migrateLegacyBagsToTrips();
+  if (cleanedBagRecords || migratedBagCount) persist();
+  buildSuggestions();
+  renderToday();
+  renderHeaderStats();
+  checkRestoreOnLaunch();
+}
+
+initApp();
 
 </script>
 </body>
